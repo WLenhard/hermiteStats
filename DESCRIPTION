@@ -1,0 +1,27 @@
+Package: hermiteStats
+Type: Package
+Title: Distribution-Robust Statistics via Hermite Polynomial Quantile Modeling
+Version: 0.1.0
+Authors@R: c(
+    person("Wolfgang", "Lenhard", email = "wolfgang.lenhard@uni-wuerzburg.de", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0002-2321-7299")),
+    person("Alexandra", "Lenhard", role = "aut")
+  )
+Description: Provides distribution-robust estimators of the Pearson correlation 
+    coefficient (Hermite-Mehler correlation) and standardized mean differences 
+    (distribution-free effect size d_reg) using rank-based inverse-normal scores, 
+    monotone polynomial quantile modeling, and analytical moment extraction via 
+    orthogonal Probabilists' Hermite polynomials and Mehler's identity.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Imports:
+    stats,
+    graphics,
+    grDevices
+Suggests:
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown
+URL: https://github.com/yourusername/hermiteStats
+BugReports: https://github.com/yourusername/hermiteStats/issues
+Config/roxygen2/version: 8.0.0
