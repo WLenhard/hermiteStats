@@ -13,6 +13,23 @@
   ...
 )
 }
+\arguments{
+\item{object}{An object of class \code{"cor_hermite"}.}
+
+\item{parm}{Ignored.}
+
+\item{level}{Numeric scalar; confidence level (default is \code{0.95}).}
+
+\item{method}{Character; \code{"fisher"} (default) or \code{"bootstrap"}.}
+
+\item{B}{Integer; number of bootstrap replications (default is \code{1000L}).}
+
+\item{...}{Additional arguments.}
+}
+\value{
+A matrix of dimension \code{1 x 2} with confidence limits.
+}
 \description{
-Confidence Intervals for Hermite Correlation
+Computes analytical Fisher \eqn{z} or non-parametric percentile bootstrap
+confidence intervals for \code{cor_hermite} objects.
 }

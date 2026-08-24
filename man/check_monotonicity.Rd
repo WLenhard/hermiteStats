@@ -2,7 +2,7 @@
 % Please edit documentation in R/quantile_engine.R
 \name{check_monotonicity}
 \alias{check_monotonicity}
-\title{Check Monotonicity of a Polynomial Function}
+\title{Check Monotonicity of a Polynomial Quantile Function}
 \usage{
 check_monotonicity(
   coeffs,
@@ -12,18 +12,30 @@ check_monotonicity(
 )
 }
 \arguments{
-\item{coeffs}{Numeric vector of polynomial coefficients (from degree 0 to k).}
+\item{coeffs}{Numeric vector of monomial coefficients \eqn{(\beta_0, \beta_1, \dots, \beta_k)}
+representing the polynomial \eqn{f(z) = \sum_{j=0}^k \beta_j z^j}.}
 
-\item{z_range}{Numeric vector of length 2 defining \code{c(min_z, max_z)}.}
+\item{z_range}{Numeric vector of length 2 specifying the interval \code{c(min_z, max_z)}
+over which monotonicity is evaluated. Default is \code{c(-4, 4)}.}
 
-\item{method}{Character; \code{"relaxed"} (default), \code{"strict"}, or \code{"none"}.}
+\item{method}{Character string specifying the verification criterion:
+\describe{
+  \item{\code{"relaxed"}}{(Default) Evaluates empirical rank concordance
+    (\eqn{\rho_{\text{Spearman}} \ge 0.95}) between latent normal scores \eqn{z} and fitted
+    values \eqn{\hat{x} = f(z)}, combined with a positive linear slope (\eqn{\beta_1 > 0}).}
+  \item{\code{"strict"}}{Analytically computes the global minimum of the first derivative
+    \eqn{f'(z)} over \code{z_range} by extracting the roots of \eqn{f''(z)} via
+    \code{\link[stats]{polyroot}}. Requires \eqn{\min f'(z) \ge 0}.}
+  \item{\code{"none"}}{Bypasses monotonicity testing; always returns \code{TRUE}.}
+}}
 
-\item{z}{Optional numeric vector of sample z-scores for empirical checks.}
+\item{z}{Optional numeric vector of observed or evaluated standard normal scores.}
 }
 \value{
 A list with logical element \code{is_monotonic} and diagnostic parameters.
 }
 \description{
-Checks whether a fitted polynomial quantile function is strictly or empirically
-monotonic over the observed standard normal domain.
+Evaluates whether a polynomial quantile function \eqn{X = f(Z)} is strictly or
+empirically monotonically increasing over a specified standard normal domain
+\eqn{[z_{\min}, z_{\max}]}.
 }

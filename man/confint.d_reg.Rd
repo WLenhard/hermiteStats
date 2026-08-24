@@ -2,7 +2,7 @@
 % Please edit documentation in R/d_reg.R
 \name{confint.d_reg}
 \alias{confint.d_reg}
-\title{Confidence Intervals for d_reg Objects}
+\title{Confidence Intervals for Distribution-Free Effect Sizes}
 \usage{
 \method{confint}{d_reg}(
   object,
@@ -13,6 +13,23 @@
   ...
 )
 }
+\arguments{
+\item{object}{An object of class \code{"d_reg"}.}
+
+\item{parm}{Ignored.}
+
+\item{level}{Numeric scalar; confidence level (default is \code{0.95}).}
+
+\item{method}{Character; \code{"bootstrap"} (default) or \code{"nct"}.}
+
+\item{B}{Integer; number of bootstrap replications (default is \code{1000L}).}
+
+\item{...}{Additional arguments.}
+}
+\value{
+A matrix of dimension \code{1 x 2} with confidence limits.
+}
 \description{
-Confidence Intervals for d_reg Objects
+Computes analytical noncentral \eqn{t} (lambda-prime) or non-parametric
+percentile bootstrap confidence intervals for \code{d_reg} objects.
 }

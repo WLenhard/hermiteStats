@@ -2,16 +2,18 @@
 % Please edit documentation in R/quantile_engine.R
 \name{hermite_moments}
 \alias{hermite_moments}
-\title{Extract Moments from a hermite_fit Object}
+\title{Extract Regularized Distributional Moments}
 \usage{
 hermite_moments(object)
 }
 \arguments{
-\item{object}{An object of class \code{"hermite_fit"}.}
+\item{object}{An object of class \code{"hermite_fit"} returned by \code{\link{hermite_fit}}.}
 }
 \value{
-A list with elements \code{mean}, \code{variance}, and \code{sd}.
+A named list containing \code{mean}, \code{variance}, \code{sd},
+  \code{skewness}, \code{excess_kurtosis}, and \code{kurtosis}.
 }
 \description{
-Extract Moments from a hermite_fit Object
+Retrieves the regularized population moments (\eqn{\mu, \sigma^2, \sigma, \text{skewness } \gamma_1, \text{excess kurtosis } \gamma_2})
+derived from a fitted \code{hermite_fit} object.
 }
