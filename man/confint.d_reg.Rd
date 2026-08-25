@@ -16,20 +16,38 @@
 \arguments{
 \item{object}{An object of class \code{"d_reg"}.}
 
-\item{parm}{Ignored.}
+\item{parm}{Ignored (present for S3 consistency with \code{\link[stats]{confint}}).}
 
-\item{level}{Numeric scalar; confidence level (default is \code{0.95}).}
+\item{level}{Numeric scalar; confidence level (default \code{0.95}).}
 
 \item{method}{Character; \code{"bootstrap"} (default) or \code{"nct"}.}
 
-\item{B}{Integer; number of bootstrap replications (default is \code{1000L}).}
+\item{B}{Integer; number of bootstrap replications (default \code{1000L}).}
 
-\item{...}{Additional arguments.}
+\item{...}{Additional arguments (currently unused).}
 }
 \value{
-A matrix of dimension \code{1 x 2} with confidence limits.
+A \code{1 x 2} matrix of confidence limits.
 }
 \description{
-Computes analytical noncentral \eqn{t} (lambda-prime) or non-parametric
-percentile bootstrap confidence intervals for \code{d_reg} objects.
+Confidence Intervals for Distribution-Free Effect Sizes
+}
+\details{
+For \code{method = "nct"}, the analytical noncentral-t inversion
+(\code{\link{ci_nct}}) requires an effective sample size \eqn{\tilde n}
+matched to the design:
+\itemize{
+  \item \strong{Paired designs} (\code{object$paired = TRUE}): \eqn{\tilde n = n_1}
+        (the number of pairs) and \code{df = n1 - 1}, treating \eqn{d_z}
+        as a one-sample/paired-t statistic.
+  \item \strong{Glass's \eqn{\Delta}} (\code{object$type == "glass"}):
+        \eqn{\tilde n = n_1} and \code{df = n1 - 1}, consistent with
+        standardizing by the Group 1 SD alone.
+  \item \strong{All other independent-groups cases}: the classical
+        two-sample harmonic form \eqn{\tilde n = n_1 n_2/(n_1+n_2)} and
+        \code{df = n1 + n2 - 2}.
+}
+The \code{"bootstrap"} method makes no such distributional assumption and
+is recommended as the default for general use, especially for skewed or
+small-sample data.
 }

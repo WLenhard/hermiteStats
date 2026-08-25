@@ -2,15 +2,30 @@
 % Please edit documentation in R/plots.R
 \name{plot.d_reg}
 \alias{plot.d_reg}
-\title{Diagnostic Visualizations for hermiteStats Objects}
+\title{Plot a Distribution-Free Effect Size Fit}
 \usage{
 \method{plot}{d_reg}(x, ...)
 }
 \arguments{
-\item{x}{An object of class \code{"d_reg"}, \code{"cor_hermite"}, or \code{"hermite_fit"}.}
+\item{x}{An object of class \code{"d_reg"}.}
 
-\item{...}{Graphical parameters passed to base plotting functions.}
+\item{...}{Currently unused (present for S3 consistency).}
+}
+\value{
+The object \code{x}, invisibly.
 }
 \description{
-Diagnostic Visualizations for hermiteStats Objects
+Displays two panels: the empirical densities of both groups with their
+regularized means marked and the effect size (and confidence interval, if
+computed) annotated; and both groups' regularized quantile maps overlaid on
+a single panel, allowing direct visual comparison of the fitted marginal
+shapes.
+}
+\examples{
+set.seed(1)
+ctrl <- rlnorm(30, meanlog = 2.0, sdlog = 0.5)
+trt  <- rlnorm(30, meanlog = 2.3, sdlog = 0.5)
+fit <- d_reg(ctrl, trt, conf_level = 0.95)
+plot(fit)
+
 }

@@ -1,0 +1,1361 @@
+DESCRIPTION
+
+Package: hermiteStats
+Type: Package
+Title: Distribution-Robust Statistics via Hermite Polynomial Quantile Modeling
+Version: 0.1.0
+Authors@R: c(
+    person("Wolfgang", "Lenhard", 
+           email = "wolfgang.lenhard@uni-wuerzburg.de", 
+           role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0002-2321-7299")),
+    person("Alexandra", "Lenhard", 
+           email = "alexandra.lenhard@psychometrica.de",
+           role = c("aut"),
+           comment = c(ORCID = "0000-0002-5309-8472"))
+  )
+Description: Provides distribution-robust estimation and statistical inference
+    for bivariate correlations and standardized mean differences (effect sizes)
+    without requiring distributional assumptions. Traditional robust methods
+    often achieve stability by trimming, Winsorizing, or converting data to
+    ranks, thereby inadvertently changing the target estimand and discarding
+    authentic tail variance. The methods in this package map empirical data to
+    standard normal scores via rank-based inverse-normal transformation (Normal
+    Quantile Transformation), model the empirical quantile functions using
+    regularized monotone polynomials, and extract distributional moments in
+    exact closed algebraic form using monic Probabilists' Hermite polynomials
+    and Isserlis' (1918) <doi:10.1093/biomet/12.1-2.134> theorem. For bivariate
+    data, the joint covariance is computed analytically under a latent Gaussian
+    copula via Mehler's (1866) <doi:10.1515/crll.1866.66.161> bilinear
+    expansion. The package provides: (1) The Hermite-Mehler correlation (r_HM),
+    the latent copula correlation, and the shape-attenuation factor (A), which
+    quantifies the ceiling on manifest association imposed by marginal shape
+    mismatch (Hoeffding-Frechet bounds); (2) The distribution-free effect size
+    (d_reg) for independent and paired samples, retaining the interpretation
+    and metric of Cohen's d / Hedges' g while drastically reducing sampling
+    variance and mean squared error (MSE) in small samples (n < 50); and (3)
+    Analytical and bootstrap confidence intervals alongside diagnostic
+    visualization tools.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Depends:
+    R (>= 3.5.0)
+Imports:
+    graphics,
+    grDevices,
+    stats
+Suggests:
+    knitr,
+    rmarkdown,
+    testthat (>= 3.0.0)
+URL: https://github.com/WLenhard/hermiteStats
+BugReports: https://github.com/WLenhard/hermiteStats/issues
+VignetteBuilder: knitr
+Config/roxygen2/version: 8.0.0
+
+
+
+NAMESPACE
+export(check_monotonicity)
+export(cor_hermite)
+export(d_cohen)
+export(d_reg)
+export(hedges_g)
+export(hermite_fit)
+export(hermite_moments)
+
+S3method(confint, cor_hermite)
+S3method(confint, d_reg)
+S3method(cor_hermite, data.frame)
+S3method(cor_hermite, default)
+S3method(cor_hermite, matrix)
+S3method(d_reg, default)
+S3method(d_reg, formula)
+S3method(plot, cor_hermite)
+S3method(plot, d_reg)
+S3method(plot, hermite_fit)
+S3method(print, cor_hermite)
+S3method(print, cor_hermite_matrix)
+S3method(print, d_reg)
+S3method(print, hermite_fit)
+S3method(summary, cor_hermite)
+S3method(summary, d_reg)
+S3method(summary, hermite_fit)
+
+
+
+quantile_engine.R
+#' @title Mathematical Core and Quantile Modeling Engine
+#'
+#' @description
+#' Low-level mathematical routines for rank-based inverse-normal quantile
+#' modeling, orthogonal Probabilists' Hermite polynomial basis transformations,
+#' analytical moment extraction via Isserlis' theorem, and monotonicity verification.
+#'
+#' @details
+#' The functions in this module form the foundational mathematical backbone
+#' of \code{hermiteStats}. They provide the machinery to transform arbitrary
+#' continuous or finely graded empirical distributions into regularized,
+#' continuous quantile functions \eqn{X = f(Z)} defined over the standard normal
+#' domain \eqn{Z \sim \mathcal{N}(0, 1)}, and to derive their population moments
+#' (\eqn{\mu, \sigma^2, \sigma}) in exact closed algebraic form.
+#'
+#' @name quantile_engine
+#' @keywords internal
+NULL
+
+
+# -----------------------------------------------------------------------------
+# Internal Helpers: Raw Normal Moments & Hermite Basis Operator
+# -----------------------------------------------------------------------------
+
+#' Compute Standard Normal Raw Moments E[Z^j]
+#' @noRd
+.z_raw_moments <- function(max_j) {
+  moms <- numeric(max_j + 1L)
+  moms[1L] <- 1.0  # j = 0
+  if (max_j >= 2L) {
+    for (j in seq(2L, max_j, by = 2L)) {
+      moms[j + 1L] <- prod(seq(j - 1L, 1L, by = -2L))
+    }
+  }
+  moms
+}
+
+#' Matrix Operator for Monomial-to-Hermite Basis Conversion
+#' @noRd
+.hermite_basis_matrix <- function(degree) {
+  H_mat <- matrix(0.0, nrow = degree + 1L, ncol = degree + 1L)
+  z_moms <- .z_raw_moments(2L * degree)
+  for (n in 0:degree) {
+    for (m in 0:n) {
+      if ((n - m) %% 2L == 0L) {
+        k <- (n - m) / 2L
+        H_mat[m + 1L, n + 1L] <- choose(n, 2L * k) * z_moms[2L * k + 1L]
+      }
+    }
+  }
+  H_mat
+}
+
+#' Compute Distributional Moments from Monomial Coefficients
+#' @noRd
+.extract_all_moments <- function(beta) {
+  deg <- length(beta) - 1L
+  if (deg < 0L) {
+    return(list(mean = NA_real_, variance = NA_real_, sd = NA_real_,
+                skewness = NA_real_, excess_kurtosis = NA_real_, kurtosis = NA_real_,
+                hermite_coeffs = numeric(0)))
+  }
+
+  # Mean & Variance via Orthogonal Hermite Basis
+  H <- .hermite_basis_matrix(deg)
+  a <- as.vector(H %*% beta)
+  mean_val <- a[1L]
+
+  if (deg == 0L) {
+    return(list(mean = mean_val, variance = 0.0, sd = 0.0,
+                skewness = 0.0, excess_kurtosis = 0.0, kurtosis = 3.0,
+                hermite_coeffs = a))
+  }
+
+  var_val <- max(0.0, sum((a[-1L]^2) * factorial(1L:deg)))
+  sd_val  <- sqrt(var_val)
+
+  if (var_val <= 1e-12) {
+    return(list(mean = mean_val, variance = 0.0, sd = 0.0,
+                skewness = 0.0, excess_kurtosis = 0.0, kurtosis = 3.0,
+                hermite_coeffs = a))
+  }
+
+  # Centered Polynomial for 3rd and 4th Central Moments
+  beta_c <- beta
+  beta_c[1L] <- beta_c[1L] - mean_val
+
+  # Precompute moments up to power 4 * deg
+  z_moms <- .z_raw_moments(4L * deg)
+
+  # 3rd Central Moment (mu3)
+  idx3 <- outer(outer(0:deg, 0:deg, `+`), 0:deg, `+`)
+  coef3 <- outer(outer(beta_c, beta_c), beta_c)
+  mu3 <- sum(coef3 * z_moms[idx3 + 1L])
+  skew_val <- mu3 / (sd_val^3)
+
+  # 4th Central Moment (mu4)
+  idx4 <- outer(outer(outer(0:deg, 0:deg, `+`), 0:deg, `+`), 0:deg, `+`)
+  coef4 <- outer(outer(outer(beta_c, beta_c), beta_c), beta_c)
+  mu4 <- sum(coef4 * z_moms[idx4 + 1L])
+  kurt_raw <- mu4 / (var_val^2)
+  kurt_excess <- kurt_raw - 3.0
+
+  list(
+    mean = mean_val,
+    variance = var_val,
+    sd = sd_val,
+    skewness = skew_val,
+    excess_kurtosis = kurt_excess,
+    kurtosis = kurt_raw,
+    hermite_coeffs = a
+  )
+}
+
+# -----------------------------------------------------------------------------
+# Exported Function: check_monotonicity
+# -----------------------------------------------------------------------------
+
+#' Check Monotonicity of a Polynomial Quantile Function
+#'
+#' Evaluates whether a polynomial quantile function \eqn{X = f(Z)} is strictly or
+#' empirically monotonically increasing over a specified standard normal domain
+#' \eqn{[z_{\min}, z_{\max}]}.
+#'
+#' @param coeffs Numeric vector of monomial coefficients \eqn{(\beta_0, \beta_1, \dots, \beta_k)}
+#'   representing the polynomial \eqn{f(z) = \sum_{j=0}^k \beta_j z^j}.
+#' @param z_range Numeric vector of length 2 specifying the interval \code{c(min_z, max_z)}
+#'   over which monotonicity is evaluated. Default is \code{c(-4, 4)}.
+#' @param method Character string specifying the verification criterion:
+#'   \describe{
+#'     \item{\code{"relaxed"}}{(Default) Evaluates empirical rank concordance
+#'       (\eqn{\rho_{\text{Spearman}} \ge 0.95}) between latent normal scores \eqn{z} and fitted
+#'       values \eqn{\hat{x} = f(z)}, combined with a positive linear slope (\eqn{\beta_1 > 0}).}
+#'     \item{\code{"strict"}}{Analytically computes the global minimum of the first derivative
+#'       \eqn{f'(z)} over \code{z_range} by extracting the roots of \eqn{f''(z)} via
+#'       \code{\link[stats]{polyroot}}. Requires \eqn{\min f'(z) \ge 0}.}
+#'     \item{\code{"none"}}{Bypasses monotonicity testing; always returns \code{TRUE}.}
+#'   }
+#' @param z Optional numeric vector of observed or evaluated standard normal scores.
+#'
+#' @return A list with logical element \code{is_monotonic} and diagnostic parameters.
+#' @export
+check_monotonicity <- function(coeffs, z_range = c(-4, 4),
+                               method = c("relaxed", "strict", "none"),
+                               z = NULL) {
+  method <- match.arg(method)
+  coeffs[is.na(coeffs)] <- 0
+  deg <- length(coeffs) - 1L
+
+  if (method == "none" || deg <= 0L) {
+    return(list(is_monotonic = TRUE, min_derivative = 0, rank_concordance = 1.0, method = method))
+  }
+
+  if (deg == 1L) {
+    slope <- coeffs[2L]
+    return(list(
+      is_monotonic = slope >= 0,
+      min_derivative = slope,
+      rank_concordance = if (slope >= 0) 1.0 else -1.0,
+      method = method
+    ))
+  }
+
+  if (method == "strict") {
+    d1 <- coeffs[-1L] * seq_len(deg)
+    eval_d1 <- function(val) sum(d1 * (val^(0:(deg - 1L))))
+    pts <- z_range
+    if (deg >= 2L) {
+      d2 <- d1[-1L] * seq_len(deg - 1L)
+      if (any(d2 != 0)) {
+        r <- tryCatch(stats::polyroot(d2), error = function(e) complex(0))
+        real_r <- Re(r)[abs(Im(r)) < 1e-8]
+        pts <- c(pts, real_r[real_r >= z_range[1L] & real_r <= z_range[2L]])
+      }
+    }
+    slopes <- vapply(unique(pts), eval_d1, numeric(1L))
+    min_slope <- min(slopes)
+    return(list(
+      is_monotonic = min_slope >= -1e-8,
+      min_derivative = min_slope,
+      rank_concordance = NA_real_,
+      method = method
+    ))
+  }
+
+  if (is.null(z)) {
+    z <- seq(z_range[1L], z_range[2L], length.out = 100L)
+  }
+  Zmat <- outer(z, 0:deg, `^`)
+  fitted_vals <- as.vector(Zmat %*% coeffs)
+
+  rank_cor <- tryCatch(stats::cor(z, fitted_vals, method = "spearman"), error = function(e) 0)
+  is_mono <- (!is.na(rank_cor)) && (rank_cor >= 0.95) && (coeffs[2L] > 0)
+
+  list(
+    is_monotonic = is_mono,
+    min_derivative = NA_real_,
+    rank_concordance = rank_cor,
+    method = method
+  )
+}
+
+# -----------------------------------------------------------------------------
+# Exported Function: hermite_fit
+# -----------------------------------------------------------------------------
+
+#' Fit a Regularized Monotone Quantile Polynomial
+#'
+#' Maps empirical observations onto standard normal scores via rank-based
+#' inverse-normal transformation (Normal Quantile Transformation; NQT) and fits
+#' a regularized monotone polynomial quantile function \eqn{X = f(Z)}.
+#' Orthogonal Probabilists' Hermite polynomial weights and closed-form population
+#' moments (\eqn{\mu, \sigma^2, \sigma, \text{skewness } \gamma_1, \text{excess kurtosis } \gamma_2})
+#' are automatically extracted.
+#'
+#' @param x Numeric vector of observations. Missing and infinite values are
+#'   automatically removed.
+#' @param degree Integer scalar; maximum polynomial degree (default is \code{3}).
+#' @param monotonicity Monotonicity constraint: \code{"relaxed"} (default), \code{"strict"}, or \code{"none"}.
+#' @param ties_method Method for handling rank ties: \code{"average"} (default) or \code{"random"}.
+#' @param force_odd Logical; if \code{TRUE} (default), restricts polynomial degree to odd values.
+#'
+#' @return An S3 object of class \code{"hermite_fit"} containing:
+#' \describe{
+#'   \item{\code{beta}}{Fitted monomial coefficients \eqn{(\beta_0, \dots, \beta_k)}.}
+#'   \item{\code{hermite_coeffs}}{Orthogonal Probabilists' Hermite weights \eqn{(a_0, \dots, a_k)}.}
+#'   \item{\code{degree}}{Realized polynomial degree.}
+#'   \item{\code{degree_requested}}{Requested polynomial degree.}
+#'   \item{\code{mean}}{Regularized population mean \eqn{\mu = a_0}.}
+#'   \item{\code{variance}}{Regularized population variance \eqn{\sigma^2 = \sum_{m=1}^k a_m^2 m!}.}
+#'   \item{\code{sd}}{Regularized population standard deviation \eqn{\sigma = \sqrt{\sigma^2}}.}
+#'   \item{\code{skewness}}{Regularized population skewness \eqn{\gamma_1 = \mu_3 / \sigma^3}.}
+#'   \item{\code{excess_kurtosis}}{Regularized population excess kurtosis \eqn{\gamma_2 = \mu_4 / \sigma^4 - 3}.}
+#'   \item{\code{kurtosis}}{Regularized raw Pearson kurtosis \eqn{\beta_2 = \mu_4 / \sigma^4}.}
+#'   \item{\code{n}}{Sample size.}
+#'   \item{\code{n_unique}}{Number of unique observations.}
+#'   \item{\code{tie_proportion}}{Proportion of tied values.}
+#'   \item{\code{monotonicity}}{Monotonicity check applied.}
+#'   \item{\code{ties_method}}{Tie-handling method applied.}
+#'   \item{\code{x}}{Cleaned input observations.}
+#'   \item{\code{z}}{Latent standard normal scores.}
+#' }
+#'
+#' @references
+#' Isserlis, L. (1918). On a formula for the product-moment coefficient of any order of a normal frequency distribution. \emph{Biometrika}, 12(1/2), 134–139. \doi{10.1093/biomet/12.1-2.134}
+#'
+#' @export
+hermite_fit <- function(x, degree = 3L,
+                        monotonicity = c("relaxed", "strict", "none"),
+                        ties_method = c("average", "random"),
+                        force_odd = TRUE) {
+  monotonicity <- match.arg(monotonicity)
+  ties_method  <- match.arg(ties_method)
+
+  x_clean <- x[is.finite(x)]
+  n <- length(x_clean)
+  if (n < 3L) stop("Need at least 3 valid observations.")
+
+  n_uniq <- length(unique(x_clean))
+  tie_prop <- 1 - (n_uniq / n)
+
+  d_cap <- min(as.integer(degree), n_uniq - 1L)
+  if (tie_prop > 0.30 && d_cap > 3L) {
+    d_cap <- min(d_cap, max(3L, floor(n_uniq / 2L)))
+  }
+  if (force_odd && (d_cap %% 2L == 0L)) d_cap <- d_cap - 1L
+  d_cap <- max(1L, d_cap)
+
+  p <- (rank(x_clean, ties.method = ties_method) - 0.5) / n
+  z <- stats::qnorm(p)
+  z_range <- range(z)
+
+  cur_deg <- d_cap
+  step <- if (force_odd) 2L else 1L
+  beta_res <- NULL
+
+  while (cur_deg >= 1L) {
+    Zmat <- outer(z, 0:cur_deg, `^`)
+    beta <- tryCatch(qr.solve(Zmat, x_clean), error = function(e) rep(NA_real_, cur_deg + 1L))
+
+    if (!any(is.na(beta))) {
+      chk <- check_monotonicity(beta, z_range = z_range, method = monotonicity, z = z)
+      if (chk$is_monotonic) {
+        beta_res <- beta
+        break
+      }
+    }
+    cur_deg <- cur_deg - step
+  }
+
+  if (is.null(beta_res)) {
+    cur_deg <- 1L
+    Zmat <- outer(z, 0:1, `^`)
+    beta_res <- tryCatch(qr.solve(Zmat, x_clean), error = function(e) c(mean(x_clean), stats::sd(x_clean)))
+  }
+
+  # Extract all regularized moments
+  moms <- .extract_all_moments(beta_res)
+
+  res <- list(
+    beta = beta_res,
+    hermite_coeffs = moms$hermite_coeffs,
+    degree = cur_deg,
+    degree_requested = degree,
+    mean = moms$mean,
+    variance = moms$variance,
+    sd = moms$sd,
+    skewness = moms$skewness,
+    excess_kurtosis = moms$excess_kurtosis,
+    kurtosis = moms$kurtosis,
+    n = n,
+    n_unique = n_uniq,
+    tie_proportion = tie_prop,
+    monotonicity = monotonicity,
+    ties_method = ties_method,
+    x = x_clean,
+    z = z
+  )
+  class(res) <- "hermite_fit"
+  res
+}
+
+# -----------------------------------------------------------------------------
+# Exported Function: hermite_moments
+# -----------------------------------------------------------------------------
+
+#' Extract Regularized Distributional Moments
+#'
+#' Retrieves the regularized population moments (\eqn{\mu, \sigma^2, \sigma, \text{skewness } \gamma_1, \text{excess kurtosis } \gamma_2})
+#' derived from a fitted \code{hermite_fit} object.
+#'
+#' @param object An object of class \code{"hermite_fit"} returned by \code{\link{hermite_fit}}.
+#'
+#' @return A named list containing \code{mean}, \code{variance}, \code{sd},
+#'   \code{skewness}, \code{excess_kurtosis}, and \code{kurtosis}.
+#' @export
+hermite_moments <- function(object) {
+  if (!inherits(object, "hermite_fit")) {
+    stop("Argument 'object' must be an object of class 'hermite_fit'.")
+  }
+  list(
+    mean = object$mean,
+    variance = object$variance,
+    sd = object$sd,
+    skewness = object$skewness,
+    excess_kurtosis = object$excess_kurtosis,
+    kurtosis = object$kurtosis
+  )
+}
+
+# -----------------------------------------------------------------------------
+# S3 Methods: print and summary
+# -----------------------------------------------------------------------------
+
+#' @export
+print.hermite_fit <- function(x, digits = 3L, ...) {
+  cat("\n  Regularized Quantile Model (Hermite Basis)\n")
+  cat(strrep("-", 45), "\n", sep = "")
+  cat(sprintf("  Modeled Mean (mu)      :  %.*f\n", digits, x$mean))
+  cat(sprintf("  Modeled SD (sigma)     :  %.*f\n", digits, x$sd))
+  cat(sprintf("  Modeled Variance       :  %.*f\n", digits, x$variance))
+  cat(sprintf("  Modeled Skewness (g1)  :  %.*f\n", digits, x$skewness))
+  cat(sprintf("  Excess Kurtosis (g2)   :  %.*f\n", digits, x$excess_kurtosis))
+  cat(sprintf("  Fitted Polynomial Deg  :  %d (requested: %d)\n", x$degree, x$degree_requested))
+  cat(sprintf("  Sample Size (n)        :  %d (unique: %d, ties: %.1f%%)\n",
+              x$n, x$n_unique, x$tie_proportion * 100))
+  cat(sprintf("  Monotonicity Check     :  %s\n", x$monotonicity))
+  cat("\n")
+  invisible(x)
+}
+
+#' @export
+summary.hermite_fit <- function(object, digits = 3L, ...) {
+  print(object, digits = digits, ...)
+  cat("  Polynomial Coefficients (Monomial raw beta):\n")
+  beta_names <- paste0("z^", 0:object$degree)
+  names(object$beta) <- beta_names
+  print(round(object$beta, digits = digits))
+
+  cat("\n  Orthogonal Hermite Weights (a_m):\n")
+  herm_names <- paste0("He_", 0:object$degree)
+  names(object$hermite_coeffs) <- herm_names
+  print(round(object$hermite_coeffs, digits = digits))
+  cat("\n")
+  invisible(object)
+}
+
+
+d_reg.R
+
+#' @title Distribution-Free Effect Size Estimation (d_reg)
+#'
+#' @description
+#' Computes the distribution-robust standardized mean difference (\eqn{d_{\mathrm{reg}}})
+#' for independent or paired two-group designs. The method retains the classical
+#' metric and interpretation of Cohen's \eqn{d} and Hedges' \eqn{g} while
+#' achieving substantial variance reduction and lower Mean Squared Error (MSE)
+#' across non-normal continuous distributions through regularized polynomial
+#' quantile modeling and analytical Hermite moment extraction.
+#'
+#' @param x A numeric vector of observations for the first group (or baseline),
+#'   or a two-sided \code{\link[stats]{formula}} of the form \code{response ~ group}.
+#' @param y A numeric vector of observations for the second group (or intervention).
+#'   Ignored when \code{x} is a formula.
+#' @param data An optional data frame, list, or environment containing the
+#'   variables in \code{formula}.
+#' @param degree Integer scalar; maximum polynomial degree for the empirical
+#'   quantile functions (default is \code{3}). Automatically steps down if
+#'   monotonicity is violated or unique values are limited.
+#' @param monotonicity Character string specifying the monotonicity constraint:
+#'   \describe{
+#'     \item{\code{"relaxed"}}{(Default) Empirical rank-concordance criterion
+#'       (\eqn{\rho_{\text{Spearman}} \ge 0.95}). Recommended for general empirical applications.}
+#'     \item{\code{"strict"}}{Analytical root check ensuring the first derivative
+#'       \eqn{f'(z) \ge 0} across the entire standard normal support.}
+#'     \item{\code{"none"}}{Unconstrained polynomial fitting.}
+#'   }
+#' @param paired Logical; if \code{TRUE}, evaluates a paired-samples (within-subjects /
+#'   pre-post) design. Default is \code{FALSE}.
+#' @param type Character string specifying the effect size estimator:
+#'   \describe{
+#'     \item{\code{"regularized"}}{(Default) Distribution-free effect size \eqn{d_{\mathrm{reg}}}
+#'       using regularized polynomial quantile modeling. Optimal for \eqn{n < 50} and non-normal data.}
+#'     \item{\code{"hedges"}}{Traditional small-sample bias-corrected Hedges' \eqn{g}
+#'       using sample pooled standard deviation and exact \eqn{J(df)} correction.}
+#'     \item{\code{"glass"}}{Glass's \eqn{\Delta} using only the baseline (Group 1) standard deviation.}
+#'     \item{\code{"combined"}}{Hybrid estimator: utilizes \eqn{d_{\mathrm{reg}}} by default,
+#'       but falls back to Hedges' \eqn{g} when both \eqn{n_1, n_2 > 50} and \eqn{|d_{\mathrm{reg}}| > 0.8}.}
+#'   }
+#' @param conf_level Numeric value in \eqn{(0, 1)} specifying the confidence level
+#'   (e.g., \code{0.95} for a 95\% CI), or \code{NULL} (default) for point estimation only.
+#' @param ci_method Character string specifying the confidence interval calculation method:
+#'   \describe{
+#'     \item{\code{"bootstrap"}}{(Default) Non-parametric percentile bootstrap refitting
+#'       the full quantile regularization pipeline in each replication.}
+#'     \item{\code{"nct"}}{Analytical inversion of the noncentral \eqn{t} (lambda-prime) distribution.}
+#'   }
+#' @param B Integer scalar; number of bootstrap resamples if \code{ci_method = "bootstrap"}.
+#'   Default is \code{1000L}.
+#' @param ... Additional arguments passed to methods.
+#'
+#' @details
+#' \subsection{Theoretical Foundation}{
+#' Traditional standardized mean differences (Cohen's \eqn{d}, Hedges' \eqn{g}) rely on
+#' unregularized sample means and variances. In small samples or in the presence of
+#' skewness, heavy tails, and outliers, sample variances become volatile, severely
+#' inflating the Mean Squared Error (MSE) of the effect size. Conversely, rank-based
+#' alternatives (e.g., Cliff's \eqn{\delta}, rank-biserial correlation) or 20\% Winsorization
+#' (\eqn{d_{\mathrm{AKP}}}; Algina et al., 2005) alter the target estimand, shifting away
+#' from the population mean difference on the observed metric.
+#'
+#' The \eqn{d_{\mathrm{reg}}} estimator avoids both extremes:
+#' \enumerate{
+#'   \item \strong{Inverse Normal Quantile Transformation:} Observations within each group
+#'         are mapped to standard normal scores \eqn{Z \sim \mathcal{N}(0, 1)}.
+#'   \item \strong{Monotone Polynomial Smoothing:} The empirical quantile functions
+#'         \eqn{X_1 = f_1(Z_1)} and \eqn{X_2 = f_2(Z_2)} are approximated with low-degree
+#'         monotone polynomials via OLS regression.
+#'   \item \strong{Analytical Moment Derivation:} Distributional population moments
+#'         (\eqn{\hat{\mu}_1, \hat{\mu}_2, \hat{\sigma}_1^2, \hat{\sigma}_2^2}) are derived
+#'         in exact closed form using orthogonal Probabilists' Hermite polynomials and
+#'         Isserlis' (1918) theorem without numerical integration.
+#'   \item \strong{Standardization:} For independent groups, the effect size is standardized
+#'         by the unweighted root-mean-square of the population variances:
+#'         \deqn{d_{\mathrm{reg}} = \frac{\hat{\mu}_2 - \hat{\mu}_1}{\hat{\sigma}_{\text{avg}}}, \quad \text{where } \hat{\sigma}_{\text{avg}} = \sqrt{\frac{\hat{\sigma}_1^2 + \hat{\sigma}_2^2}{2}}}
+#' }
+#' }
+#'
+#' \subsection{Paired / Within-Subject Designs}{
+#' When \code{paired = TRUE}, \code{d_reg} provides two complementary standardized metrics:
+#' \itemize{
+#'   \item \strong{Raw-scale Effect Size (\eqn{d_{\mathrm{reg}}} or \eqn{d_{\mathrm{rm}}}):} Standardized
+#'         by the average marginal standard deviation \eqn{\hat{\sigma}_{\text{avg}}}. Retains the
+#'         original metric and is directly comparable to independent-group effect sizes in meta-analyses.
+#'   \item \strong{Standardized Mean Change (\eqn{d_z}):} Standardized by the regularized standard
+#'         deviation of the change scores \eqn{D = X_2 - X_1}:
+#'         \deqn{d_z = \frac{\hat{\mu}_D}{\hat{\sigma}_D}}
+#'         where \eqn{\hat{\sigma}_D = \sqrt{\hat{\sigma}_1^2 + \hat{\sigma}_2^2 - 2 r_{\mathrm{HM}} \hat{\sigma}_1 \hat{\sigma}_2}},
+#'         linking the change score variance directly to the Hermite–Mehler correlation \eqn{r_{\mathrm{HM}}}.
+#' }
+#' }
+#'
+#' @return An S3 object of class \code{"d_reg"} containing:
+#' \describe{
+#'   \item{\code{estimate}}{The primary effect size point estimate (\eqn{d_{\mathrm{reg}}} for independent groups, \eqn{d_z} for paired change if \code{type = "regularized"}).}
+#'   \item{\code{d_reg}}{The regularized standardized mean difference based on the average group SD (\eqn{\hat{\sigma}_{\text{avg}}}).}
+#'   \item{\code{d_z}}{The standardized mean change score (only present if \code{paired = TRUE}).}
+#'   \item{\code{hedges_g}}{The benchmark small-sample bias-corrected Hedges' \eqn{g}.}
+#'   \item{\code{glass_delta}}{Glass's \eqn{\Delta} using only Group 1 standard deviation.}
+#'   \item{\code{type}}{Character; the estimation method specified.}
+#'   \item{\code{paired}}{Logical; indicates whether a paired analysis was conducted.}
+#'   \item{\code{n1, n2}}{Sample sizes of Group 1 and Group 2.}
+#'   \item{\code{group1, group2}}{Named lists containing regularized and raw moments (\code{mean}, \code{sd}, \code{variance}, \code{raw_mean}, \code{raw_sd}).}
+#'   \item{\code{diff_moments}}{Named list containing moments of the difference scores (if \code{paired = TRUE}).}
+#'   \item{\code{r_hm_paired}}{The fitted \code{\link{cor_hermite}} object for paired observations (if \code{paired = TRUE}).}
+#'   \item{\code{sd_standardizer}}{The standardizer value used in the denominator.}
+#'   \item{\code{degrees}}{Realized polynomial degrees for each group.}
+#'   \item{\code{monotonicity}}{The monotonicity constraint applied.}
+#'   \item{\code{fit1, fit2}}{Underlying \code{\link{hermite_fit}} objects for each group.}
+#'   \item{\code{ci}}{Matrix containing confidence limits (if \code{conf_level} was specified).}
+#'   \item{\code{conf_level}}{Requested confidence level.}
+#'   \item{\code{ci_method}}{Method used for confidence interval estimation.}
+#' }
+#'
+#' @references
+#' Algina, J., Keselman, H. J., & Penfield, R. D. (2005). An alternative to Cohen’s standardized mean difference effect size: A robust parameter and confidence interval in the two independent groups case. \emph{Psychological Methods}, 10(3), 317–328. \doi{10.1037/1082-989X.10.3.317}
+#'
+#' Cohen, J. (1988). \emph{Statistical Power Analysis for the Behavioral Sciences} (2nd ed.). Lawrence Erlbaum Associates.
+#'
+#' Delacre, M., Lakens, D., Ley, C., Liu, L., & Leys, C. (2021). Why Hedges' gs based on the non-pooled standard deviation should be reported with Welch's t-test. \emph{Preprint}. \doi{10.31234/osf.io/tu6mp}
+#'
+#' Hedges, L. V. (1981). Distribution theory for Glass’s estimator of effect size and related estimators. \emph{Journal of Educational Statistics}, 6(2), 107–128. \doi{10.3102/10769986006002107}
+#'
+#' Isserlis, L. (1918). On a formula for the product-moment coefficient of any order of a normal frequency distribution. \emph{Biometrika}, 12(1/2), 134–139. \doi{10.1093/biomet/12.1-2.134}
+#'
+#' Lecoutre, B. (2007). Another look at the confidence intervals for the noncentral T distribution. \emph{Journal of Modern Applied Statistical Methods}, 6(1), 107–116. \doi{10.22237/jmasm/1177992600}
+#'
+#' Lenhard, W., & Lenhard, A. (submitted). Distribution-Free Effect Size Estimation: A Robust Alternative to Cohen’s d and other effect size estimators. \emph{Behavior Research Methods}.
+#'
+#' @seealso \code{\link{cor_hermite}}, \code{\link{hermite_fit}}, \code{\link{d_cohen}}, \code{\link{hedges_g}}
+#'
+#' @examples
+#' # ---------------------------------------------------------
+#' # 1. Independent Groups with Non-Normal Skewed Data
+#' # ---------------------------------------------------------
+#' set.seed(42)
+#' ctrl <- rlnorm(30, meanlog = 2.0, sdlog = 0.5)
+#' trt  <- rlnorm(30, meanlog = 2.3, sdlog = 0.5)
+#'
+#' # Default regularized effect size with 95% bootstrap CI
+#' fit1 <- d_reg(ctrl, trt, conf_level = 0.95, ci_method = "bootstrap")
+#' print(fit1)
+#' summary(fit1)
+#'
+#' # ---------------------------------------------------------
+#' # 2. Formula Interface
+#' # ---------------------------------------------------------
+#' dat <- data.frame(
+#'   rt = c(ctrl, trt),
+#'   cond = factor(rep(c("Control", "Treatment"), each = 30))
+#' )
+#' fit_form <- d_reg(rt ~ cond, data = dat, conf_level = 0.95)
+#' print(fit_form)
+#'
+#' # ---------------------------------------------------------
+#' # 3. Paired / Repeated-Measures Design
+#' # ---------------------------------------------------------
+#' pre  <- rlnorm(25, meanlog = 3.0, sdlog = 0.4)
+#' post <- pre + rnorm(25, mean = 4.0, sd = 1.5)
+#'
+#' fit_paired <- d_reg(pre, post, paired = TRUE, conf_level = 0.95)
+#' print(fit_paired)
+#'
+#' @author Wolfgang Lenhard, Alexandra Lenhard
+#' @export
+d_reg <- function(x, ...) {
+  UseMethod("d_reg")
+}
+
+#' @rdname d_reg
+#' @export
+d_reg.formula <- function(formula, data = NULL, degree = 3L,
+                          monotonicity = c("relaxed", "strict", "none"),
+                          paired = FALSE,
+                          type = c("regularized", "hedges", "glass", "combined"),
+                          conf_level = NULL,
+                          ci_method = c("bootstrap", "nct"),
+                          B = 1000L, ...) {
+
+  if (missing(formula) || (length(formula) != 3L)) {
+    stop("Formula must be of the form 'response ~ group'.")
+  }
+  mf <- stats::model.frame(formula = formula, data = data)
+  response <- mf[[1L]]
+  group <- as.factor(mf[[2L]])
+
+  levels_g <- levels(group)
+  if (length(levels_g) != 2L) {
+    stop("Grouping variable must have exactly two levels.")
+  }
+
+  x1 <- response[group == levels_g[1L]]
+  x2 <- response[group == levels_g[2L]]
+
+  res <- d_reg.default(x = x1, y = x2, degree = degree, monotonicity = monotonicity,
+                       paired = paired, type = type, conf_level = conf_level,
+                       ci_method = ci_method, B = B, ...)
+  res$group_labels <- levels_g
+  res
+}
+
+#' @rdname d_reg
+#' @export
+d_reg.default <- function(x, y = NULL, degree = 3L,
+                          monotonicity = c("relaxed", "strict", "none"),
+                          paired = FALSE,
+                          type = c("regularized", "hedges", "glass", "combined"),
+                          conf_level = NULL,
+                          ci_method = c("bootstrap", "nct"),
+                          B = 1000L, ...) {
+
+  monotonicity <- match.arg(monotonicity)
+  type         <- match.arg(type)
+  ci_method    <- match.arg(ci_method)
+
+  if (missing(y) || is.null(y)) stop("Vector 'y' must be supplied.")
+
+  if (paired) {
+    ok <- is.finite(x) & is.finite(y)
+    x1 <- x[ok]; x2 <- y[ok]
+    if (length(x1) != length(x2)) stop("Paired observations must have equal length.")
+  } else {
+    x1 <- x[is.finite(x)]
+    x2 <- y[is.finite(y)]
+  }
+
+  n1 <- length(x1); n2 <- length(x2)
+  if (n1 < 3L || n2 < 3L) stop("Each group must contain at least 3 valid observations.")
+
+  # Fit marginal polynomial quantile distributions
+  fit1 <- hermite_fit(x1, degree = degree, monotonicity = monotonicity, force_odd = TRUE)
+  fit2 <- hermite_fit(x2, degree = degree, monotonicity = monotonicity, force_odd = TRUE)
+
+  m1 <- hermite_moments(fit1)
+  m2 <- hermite_moments(fit2)
+
+  # Averaged standardizer for independent groups (Cohen 1988, Delacre 2021)
+  sd_avg <- sqrt((m1$variance + m2$variance) / 2.0)
+
+  # If paired, compute difference distribution and latent correlation
+  if (paired) {
+    diff_scores <- x2 - x1
+    fit_diff <- hermite_fit(diff_scores, degree = degree, monotonicity = monotonicity, force_odd = TRUE)
+    m_diff <- hermite_moments(fit_diff)
+    r_hm_fit <- cor_hermite(x1, x2, poly_degree = degree, monotonicity = monotonicity)
+
+    # d_z: standardized mean change; d_reg_val: raw-scale repeated measures SMD
+    d_z <- m_diff$mean / m_diff$sd
+    d_reg_val <- (m2$mean - m1$mean) / sd_avg
+  } else {
+    fit_diff <- NULL; m_diff <- NULL; r_hm_fit <- NULL; d_z <- NULL
+    d_reg_val <- (m2$mean - m1$mean) / sd_avg
+  }
+
+  # Classical benchmarks
+  s1 <- stats::sd(x1); s2 <- stats::sd(x2)
+  sd_pooled <- sqrt(((n1 - 1L) * s1^2 + (n2 - 1L) * s2^2) / (n1 + n2 - 2L))
+  j_corr <- .J_correction(n1 + n2 - 2L)
+  g_hedges <- ((mean(x2) - mean(x1)) / sd_pooled) * j_corr
+  glass_delta <- (mean(x2) - mean(x1)) / s1
+
+  # Type routing
+  primary_d <- switch(
+    type,
+    "regularized" = if (paired) d_z else d_reg_val,
+    "hedges"      = g_hedges,
+    "glass"       = glass_delta,
+    "combined"    = if (n1 > 50L && n2 > 50L && abs(d_reg_val) > 0.8) g_hedges else d_reg_val
+  )
+
+  res <- list(
+    estimate = primary_d,
+    d_reg = d_reg_val,
+    d_z = d_z,
+    hedges_g = g_hedges,
+    glass_delta = glass_delta,
+    type = type,
+    paired = paired,
+    n1 = n1, n2 = n2,
+    group1 = list(mean = m1$mean, sd = m1$sd, variance = m1$variance, raw_mean = mean(x1), raw_sd = s1),
+    group2 = list(mean = m2$mean, sd = m2$sd, variance = m2$variance, raw_mean = mean(x2), raw_sd = s2),
+    diff_moments = m_diff,
+    r_hm_paired = r_hm_fit,
+    sd_standardizer = if (type == "glass") s1 else if (type == "hedges") sd_pooled else sd_avg,
+    degrees = c(g1 = fit1$degree, g2 = fit2$degree),
+    monotonicity = monotonicity,
+    fit1 = fit1, fit2 = fit2,
+    x1 = x1, x2 = x2
+  )
+  class(res) <- "d_reg"
+
+  if (!is.null(conf_level)) {
+    res$ci <- stats::confint(res, level = conf_level, method = ci_method, B = B)
+    res$conf_level <- conf_level
+    res$ci_method <- ci_method
+  }
+  res
+}
+
+# -----------------------------------------------------------------------------
+# S3 Methods for d_reg: confint, print, summary
+# -----------------------------------------------------------------------------
+
+#' Confidence Intervals for Distribution-Free Effect Sizes
+#'
+#' Computes analytical noncentral \eqn{t} (lambda-prime) or non-parametric
+#' percentile bootstrap confidence intervals for \code{d_reg} objects.
+#'
+#' @param object An object of class \code{"d_reg"}.
+#' @param parm Ignored.
+#' @param level Numeric scalar; confidence level (default is \code{0.95}).
+#' @param method Character; \code{"bootstrap"} (default) or \code{"nct"}.
+#' @param B Integer; number of bootstrap replications (default is \code{1000L}).
+#' @param ... Additional arguments.
+#'
+#' @return A matrix of dimension \code{1 x 2} with confidence limits.
+#' @export
+confint.d_reg <- function(object, parm, level = 0.95,
+                          method = c("bootstrap", "nct"), B = 1000L, ...) {
+  method <- match.arg(method)
+  n1 <- object$n1; n2 <- object$n2
+
+  if (method == "bootstrap") {
+    x1 <- object$x1; x2 <- object$x2
+    boot_d <- numeric(B)
+    for (b in seq_len(B)) {
+      if (object$paired) {
+        idx <- sample.int(n1, n1, replace = TRUE)
+        fb <- d_reg(x1[idx], x2[idx], degree = max(object$degrees),
+                    monotonicity = object$monotonicity, paired = TRUE, type = object$type)
+      } else {
+        s1 <- sample(x1, n1, replace = TRUE)
+        s2 <- sample(x2, n2, replace = TRUE)
+        fb <- d_reg(s1, s2, degree = max(object$degrees),
+                    monotonicity = object$monotonicity, paired = FALSE, type = object$type)
+      }
+      boot_d[b] <- fb$estimate
+    }
+    alpha <- (1 - level) / 2
+    ci <- stats::quantile(boot_d, probs = c(alpha, 1 - alpha), na.rm = TRUE)
+  } else {
+    df <- if (object$paired) n1 - 1L else (if (object$type == "glass") n1 - 1L else n1 + n2 - 2L)
+    ci <- ci_nct(object$estimate, n1 = n1, n2 = n2, conf = level, df = df)
+  }
+
+  matrix(ci, nrow = 1L, dimnames = list("d_reg", c(paste0(100 * (1 - level)/2, " %"),
+                                                   paste0(100 * (1 + level)/2, " %"))))
+}
+
+#' @export
+print.d_reg <- function(x, digits = 3L, ...) {
+  cat("\n  Distribution-Free Effect Size Estimation (d_reg)\n")
+  cat(strrep("-", 52), "\n", sep = "")
+
+  if (x$paired) {
+    cat(sprintf("  Effect Size (d_reg, raw scale)    :  %.*f\n", digits, x$d_reg))
+    cat(sprintf("  Standardized Mean Change (d_z)    :  %.*f\n", digits, x$d_z))
+    cat(sprintf("  Paired Hermite Correlation (r_HM) :  %.*f\n", digits, x$r_hm_paired$r_hm))
+    cat(sprintf("  Averaged Model SD (sigma_avg)     :  %.*f\n", digits, x$sd_standardizer))
+    cat(sprintf("  Difference Model SD (sigma_diff)  :  %.*f\n", digits, x$diff_moments$sd))
+  } else {
+    cat(sprintf("  Effect Size (d_reg)               :  %.*f\n", digits, x$estimate))
+    cat(sprintf("  Averaged Model SD (sigma_avg)     :  %.*f\n", digits, x$sd_standardizer))
+  }
+
+  cat(sprintf("  Hedges' g (Benchmark)             :  %.*f\n", digits, x$hedges_g))
+  cat(sprintf("  Sample Sizes                      :  n1 = %d, n2 = %d\n", x$n1, x$n2))
+  cat(sprintf("  Polynomial Degrees                :  g1 = %d, g2 = %d\n", x$degrees["g1"], x$degrees["g2"]))
+  cat(sprintf("  Monotonicity Check                :  %s\n", x$monotonicity))
+
+  if (!is.null(x$ci)) {
+    cat(sprintf("  %s CI (%s): [%.*f, %.*f]\n",
+                paste0(round(x$conf_level * 100), "%"), x$ci_method,
+                digits, x$ci[1L], digits, x$ci[2L]))
+  }
+  cat("\n")
+  invisible(x)
+}
+
+#' @export
+summary.d_reg <- function(object, digits = 3L, ...) {
+  print(object, digits = digits, ...)
+  cat("  Group Distributional Moments (Polynomial Modeled):\n")
+  cat(sprintf("    Group 1: Mean = %.*f, SD = %.*f, Var = %.*f\n",
+              digits, object$group1$mean, digits, object$group1$sd, digits, object$group1$variance))
+  cat(sprintf("    Group 2: Mean = %.*f, SD = %.*f, Var = %.*f\n",
+              digits, object$group2$mean, digits, object$group2$sd, digits, object$group2$variance))
+  cat("\n")
+  invisible(object)
+}
+
+
+
+cor_hermite.R
+
+#' @title Hermite-Mehler Distribution-Robust Pearson Correlation
+#'
+#' @description
+#' Computes the distribution-robust Hermite-Mehler Pearson correlation (\eqn{r_{\mathrm{HM}}}),
+#' the latent Gaussian copula correlation (\eqn{\rho_z}), and the shape attenuation
+#' factor (\eqn{A}) for bivariate pairs or multivariate datasets.
+#'
+#' The method preserves the raw manifest Pearson correlation estimand on the original
+#' metric without changing the underlying parameter (unlike Spearman's \eqn{\rho},
+#' Kendall's \eqn{\tau}, or Gaussian rank correlations) and without discarding authentic
+#' tail variation (unlike trimming or Winsorization).
+#'
+#' @param x A numeric vector, numeric \code{\link[base]{matrix}}, or \code{\link[base]{data.frame}}.
+#' @param y A numeric vector (required if \code{x} is a vector; ignored if \code{x} is a matrix or data frame).
+#' @param poly_degree Integer scalar; maximum polynomial degree for quantile function
+#'   smoothing (default is \code{3L}). Must be an odd integer (\code{1}, \code{3}, or \code{5}).
+#' @param monotonicity Character string specifying the monotonicity constraint:
+#'   \describe{
+#'     \item{\code{"relaxed"}}{(Default) Empirical rank concordance (\eqn{\rho_{\text{Spearman}} \ge 0.95}).
+#'       Preserves degrees well in discrete, psychometric, or count data.}
+#'     \item{\code{"strict"}}{Analytical root check of the first derivative (\eqn{\min f'(z) \ge 0}).}
+#'     \item{\code{"none"}}{Unconstrained OLS polynomial fit.}
+#'   }
+#' @param ties_method Character string specifying the rank tie-handling method:
+#'   \code{"average"} (default, midranks) or \code{"random"}.
+#' @param conf_level Numeric value in \eqn{(0, 1)} specifying the confidence level
+#'   (e.g., \code{0.95} for a 95\% CI), or \code{NULL} (default) for point estimation only.
+#' @param ci_method Character string specifying the confidence interval calculation method:
+#'   \describe{
+#'     \item{\code{"fisher"}}{(Default) Fast analytical Fisher \eqn{z}-transformation with
+#'       asymptotic standard error \eqn{\mathrm{SE} = 1/\sqrt{n - 3}}.}
+#'     \item{\code{"bootstrap"}}{Non-parametric percentile bootstrap refitting the full
+#'       Hermite-Mehler pipeline across resamples.}
+#'   }
+#' @param B Integer scalar; number of bootstrap resamples if \code{ci_method = "bootstrap"}.
+#'   Default is \code{1000L}.
+#' @param ... Additional arguments passed to methods.
+#'
+#' @details
+#' \subsection{The Estimand Dilemma in Robust Correlation}{
+#' Classical Pearson's \eqn{r} suffers from severe sampling variance inflation when data
+#' depart from normality (e.g., skewness, heavy tails, outliers). Traditional robust
+#' alternatives solve this stability problem by changing the estimand:
+#' \itemize{
+#'   \item \strong{Spearman's \eqn{\rho} and Kendall's \eqn{\tau}} evaluate rank concordance
+#'         rather than linear covariation, systematically underestimating Pearson's \eqn{r}
+#'         under bivariate normality (\eqn{\mathbb{E}[\rho_s] = \frac{6}{\pi}\arcsin(\rho/2)}).
+#'   \item \strong{Trimming / Winsorization} (e.g., percentage-bend, biweight midcorrelation)
+#'         amputates structural tail variance, altering the population covariance structure.
+#'   \item \strong{Gaussian Rank Correlation} evaluates the correlation on normalized latent
+#'         scores, yielding the copula correlation \eqn{\rho_z} rather than the raw manifest \eqn{r}.
+#' }
+#' }
+#'
+#' \subsection{The Hermite-Mehler Pipeline}{
+#' The \code{cor_hermite} estimator resolves this dilemma in three steps:
+#' \enumerate{
+#'   \item \strong{Rank-Based Inverse-Normal Transformation:} Both variables are mapped
+#'         to standard normal scores \eqn{Z_x, Z_y \sim \mathcal{N}(0, 1)}. The sample
+#'         correlation of these scores yields the latent Gaussian copula parameter \eqn{\rho_z}.
+#'   \item \strong{Monotone Quantile Polynomial Fitting:} The inverse quantile functions
+#'         \eqn{X = f(Z_x)} and \eqn{Y = g(Z_y)} are approximated via low-degree monotone
+#'         polynomials via OLS regression.
+#'   \item \strong{Closed-Form Mehler Expansion:} Polynomial coefficients are re-expressed
+#'         in the basis of orthogonal Probabilists' Hermite polynomials \eqn{He_m(z)}. By
+#'         Mehler's (1866) bilinear expansion:
+#'         \deqn{\mathbb{E}\left[ He_m(Z_x) He_n(Z_y) \right] = \delta_{mn} \, m! \, \rho_z^m}
+#'         All cross-terms of differing orders vanish. The covariance and variances are
+#'         obtained in exact algebraic form:
+#'         \deqn{\operatorname{Cov}(X, Y) = \sum_{m=1}^{\min(k_x, k_y)} a_m b_m \, m! \, \rho_z^m}
+#'         \deqn{\operatorname{Var}(X) = \sum_{m=1}^{k_x} a_m^2 \, m!, \quad \operatorname{Var}(Y) = \sum_{m=1}^{k_y} b_m^2 \, m!}
+#'         \deqn{r_{\mathrm{HM}} = \frac{\operatorname{Cov}(X, Y)}{\sqrt{\operatorname{Var}(X)\operatorname{Var}(Y)}}}
+#' }
+#' }
+#'
+#' \subsection{Shape Attenuation Factor (\eqn{A})}{
+#' When marginal distribution shapes differ (e.g., a normal variable paired with a lognormal
+#' latency), the mathematically achievable Pearson correlation is strictly bounded below \eqn{1.0}
+#' (Hoeffding-Fréchet bounds; Carroll, 1961). The ratio:
+#' \deqn{A = \frac{r_{\mathrm{HM}}}{\rho_z}}
+#' provides an interpretable diagnostic index. If \eqn{A \approx 1.0}, marginal shapes do not
+#' restrict the association. If \eqn{A \ll 1.0}, reporting a raw Pearson correlation severely
+#' understates the substantive construct association purely due to scale mismatch.
+#' }
+#'
+#' @return
+#' For two vectors, an S3 object of class \code{"cor_hermite"} containing:
+#' \describe{
+#'   \item{\code{r_hm}}{Numeric; the regularized Hermite-Mehler Pearson correlation.}
+#'   \item{\code{rho_z}}{Numeric; the latent Gaussian copula correlation (Gaussian rank correlation).}
+#'   \item{\code{attenuation}}{Numeric; the shape attenuation factor \eqn{A = r_{\mathrm{HM}} / \rho_z}.}
+#'   \item{\code{cov_xy}}{Numeric; the regularized manifest covariance.}
+#'   \item{\code{var_x, var_y}}{Numeric; regularized manifest variances for \eqn{X} and \eqn{Y}.}
+#'   \item{\code{mean_x, mean_y}}{Numeric; regularized manifest means for \eqn{X} and \eqn{Y}.}
+#'   \item{\code{degrees}}{Named integer vector of realized polynomial degrees for \eqn{X} and \eqn{Y}.}
+#'   \item{\code{poly_degree_requested}}{Integer; requested maximum polynomial degree.}
+#'   \item{\code{monotonicity}}{Character; monotonicity method applied.}
+#'   \item{\code{ties_method}}{Character; tie-handling method applied.}
+#'   \item{\code{n}}{Integer; number of complete paired observations.}
+#'   \item{\code{fit_x, fit_y}}{The underlying \code{\link{hermite_fit}} objects.}
+#'   \item{\code{ci}}{Matrix containing confidence limits (if \code{conf_level} was specified).}
+#'   \item{\code{conf_level}}{Requested confidence level.}
+#'   \item{\code{ci_method}}{Method used for confidence interval estimation.}
+#' }
+#'
+#' For a matrix or data frame, an S3 object of class \code{"cor_hermite_matrix"} containing:
+#' \describe{
+#'   \item{\code{r_hm}}{Matrix of pairwise Hermite-Mehler correlations.}
+#'   \item{\code{rho_z}}{Matrix of pairwise latent copula correlations.}
+#'   \item{\code{attenuation}}{Matrix of pairwise shape attenuation factors.}
+#'   \item{\code{n}}{Integer; number of rows in the input dataset.}
+#' }
+#'
+#' @references
+#' Carroll, J. B. (1961). The nature of the data, or how to choose a correlation coefficient. \emph{Psychometrika}, 26(4), 347–372. \doi{10.1007/BF02289768}
+#'
+#' Fréchet, M. (1951). Sur les tableaux de corrélation dont les marges sont données. \emph{Annales de l'Université de Lyon}, 14, 53–77.
+#'
+#' Hermite, C. (1864). Sur un nouveau développement en série des fonctions. \emph{Comptes Rendus de l'Académie des Sciences, Paris}, 58, 93–100.
+#'
+#' Hoeffding, W. (1940). Masstabinvariante Korrelationstheorie. \emph{Schriften des Mathematischen Instituts und des Instituts für Angewandte Mathematik der Universität Berlin}, 5, 181–233.
+#'
+#' Lenhard, W., & Lenhard, A. (2026). The Hermite-Mehler Correlation: A Distribution-Robust Estimator of the Pearson Correlation Coefficient. \emph{Behavior Research Methods}. \doi{10.3758/s13428-xxx-xxxxx-x}
+#'
+#' Mehler, F. G. (1866). Ueber die Entwicklung einer Function von beliebig vielen Variabeln nach Laplaceschen Functionen höherer Ordnung. \emph{Journal für die reine und angewandte Mathematik}, 66, 161–176. \doi{10.1515/crll.1866.66.161}
+#'
+#' @seealso \code{\link{d_reg}}, \code{\link{hermite_fit}}, \code{\link{check_monotonicity}}
+#'
+#' @examples
+#' # ---------------------------------------------------------
+#' # 1. Bivariate Correlation with Marginal Shape Mismatch
+#' # ---------------------------------------------------------
+#' set.seed(123)
+#' n <- 50
+#' z <- rnorm(n)
+#' x <- rnorm(n, mean = 100, sd = 15)           # Normally distributed
+#' y <- exp(0.5 * z + rnorm(n, sd = 0.5))        # Skewed lognormal latency
+#'
+#' # Compute r_HM with 95% Fisher-z CI
+#' r_fit <- cor_hermite(x, y, conf_level = 0.95, ci_method = "fisher")
+#' print(r_fit)
+#' summary(r_fit)
+#'
+#' # ---------------------------------------------------------
+#' # 2. Multivariate Correlation Matrix
+#' # ---------------------------------------------------------
+#' data(iris)
+#' r_mat <- cor_hermite(iris[, 1:4])
+#' print(r_mat)
+#'
+#' # ---------------------------------------------------------
+#' # 3. Percentile Bootstrap Confidence Interval
+#' # ---------------------------------------------------------
+#' r_boot <- cor_hermite(x, y, conf_level = 0.95, ci_method = "bootstrap", B = 500)
+#' confint(r_boot)
+#'
+#' @author Wolfgang Lenhard, Alexandra Lenhard
+#' @export
+cor_hermite <- function(x, ...) {
+  UseMethod("cor_hermite")
+}
+
+#' @rdname cor_hermite
+#' @export
+cor_hermite.default <- function(x, y, poly_degree = 3L,
+                                monotonicity = c("relaxed", "strict", "none"),
+                                ties_method = c("average", "random"),
+                                conf_level = NULL,
+                                ci_method = c("fisher", "bootstrap"),
+                                B = 1000L, ...) {
+
+  monotonicity <- match.arg(monotonicity)
+  ties_method  <- match.arg(ties_method)
+  ci_method    <- match.arg(ci_method)
+
+  if (missing(y) || is.null(y)) stop("Argument 'y' must be supplied for two-vector correlation.")
+  if (!is.numeric(x) || !is.numeric(y)) stop("'x' and 'y' must be numeric vectors.")
+  if (length(x) != length(y)) stop("'x' and 'y' must have identical length.")
+
+  ok <- is.finite(x) & is.finite(y)
+  x_c <- x[ok]; y_c <- y[ok]
+  n <- length(x_c)
+
+  if (n < 4L) {
+    warning("Insufficient complete observations.")
+    return(structure(list(r_hm = NA_real_, rho_z = NA_real_, attenuation = NA_real_), class = "cor_hermite"))
+  }
+
+  # Fit marginal polynomial quantile functions
+  fit_x <- hermite_fit(x_c, degree = poly_degree, monotonicity = monotonicity, ties_method = ties_method, force_odd = TRUE)
+  fit_y <- hermite_fit(y_c, degree = poly_degree, monotonicity = monotonicity, ties_method = ties_method, force_odd = TRUE)
+
+  # Latent Copula Correlation
+  rho_z <- stats::cor(fit_x$z, fit_y$z)
+  rho_z <- max(-1.0, min(1.0, rho_z))
+
+  # Mehler Bilinear Covariance Integration
+  dx <- fit_x$degree; dy <- fit_y$degree
+  max_d <- max(dx, dy)
+
+  H <- .hermite_basis_matrix(max_d)
+  bx_pad <- rep(0.0, max_d + 1L); bx_pad[1:(dx + 1L)] <- fit_x$beta
+  by_pad <- rep(0.0, max_d + 1L); by_pad[1:(dy + 1L)] <- fit_y$beta
+
+  a <- as.vector(H %*% bx_pad)
+  b <- as.vector(H %*% by_pad)
+  fact_v <- factorial(1L:max_d)
+
+  var_x <- sum((a[-1L]^2) * fact_v)
+  var_y <- sum((b[-1L]^2) * fact_v)
+  cov_xy <- sum(a[-1L] * b[-1L] * fact_v * (rho_z^(1L:max_d)))
+
+  r_hm <- if (var_x <= 0 || var_y <= 0) NA_real_ else max(-1.0, min(1.0, cov_xy / sqrt(var_x * var_y)))
+  attenuation <- if (abs(rho_z) > 1e-5) r_hm / rho_z else 1.0
+
+  res <- list(
+    r_hm = r_hm,
+    rho_z = rho_z,
+    attenuation = attenuation,
+    cov_xy = cov_xy,
+    var_x = var_x, var_y = var_y,
+    mean_x = a[1L], mean_y = b[1L],
+    degrees = c(x = dx, y = dy),
+    poly_degree_requested = poly_degree,
+    monotonicity = monotonicity,
+    ties_method = ties_method,
+    n = n,
+    fit_x = fit_x,
+    fit_y = fit_y,
+    x = x_c, y = y_c
+  )
+  class(res) <- "cor_hermite"
+
+  if (!is.null(conf_level)) {
+    res$ci <- stats::confint(res, level = conf_level, method = ci_method, B = B)
+    res$conf_level <- conf_level
+    res$ci_method <- ci_method
+  }
+  res
+}
+
+#' @rdname cor_hermite
+#' @export
+cor_hermite.matrix <- function(x, poly_degree = 3L,
+                               monotonicity = c("relaxed", "strict", "none"),
+                               ties_method = c("average", "random"), ...) {
+  monotonicity <- match.arg(monotonicity)
+  ties_method  <- match.arg(ties_method)
+
+  p <- ncol(x)
+  cnames <- colnames(x)
+  if (is.null(cnames)) cnames <- paste0("V", seq_len(p))
+
+  R_hm <- matrix(1.0, nrow = p, ncol = p, dimnames = list(cnames, cnames))
+  R_copula <- matrix(1.0, nrow = p, ncol = p, dimnames = list(cnames, cnames))
+  Att_mat <- matrix(1.0, nrow = p, ncol = p, dimnames = list(cnames, cnames))
+
+  for (i in 1:(p - 1L)) {
+    for (j in (i + 1L):p) {
+      fit <- cor_hermite.default(x[, i], x[, j], poly_degree = poly_degree,
+                                 monotonicity = monotonicity, ties_method = ties_method)
+      R_hm[i, j] <- R_hm[j, i] <- fit$r_hm
+      R_copula[i, j] <- R_copula[j, i] <- fit$rho_z
+      Att_mat[i, j] <- Att_mat[j, i] <- fit$attenuation
+    }
+  }
+
+  structure(
+    list(r_hm = R_hm, rho_z = R_copula, attenuation = Att_mat, n = nrow(x)),
+    class = "cor_hermite_matrix"
+  )
+}
+
+#' @rdname cor_hermite
+#' @export
+cor_hermite.data.frame <- function(x, poly_degree = 3L,
+                                   monotonicity = c("relaxed", "strict", "none"),
+                                   ties_method = c("average", "random"), ...) {
+  cor_hermite.matrix(as.matrix(x), poly_degree = poly_degree,
+                     monotonicity = monotonicity, ties_method = ties_method, ...)
+}
+
+# -----------------------------------------------------------------------------
+# S3 Methods for cor_hermite: confint, print, summary
+# -----------------------------------------------------------------------------
+
+#' Confidence Intervals for Hermite Correlation
+#'
+#' Computes analytical Fisher \eqn{z} or non-parametric percentile bootstrap
+#' confidence intervals for \code{cor_hermite} objects.
+#'
+#' @param object An object of class \code{"cor_hermite"}.
+#' @param parm Ignored.
+#' @param level Numeric scalar; confidence level (default is \code{0.95}).
+#' @param method Character; \code{"fisher"} (default) or \code{"bootstrap"}.
+#' @param B Integer; number of bootstrap replications (default is \code{1000L}).
+#' @param ... Additional arguments.
+#'
+#' @return A matrix of dimension \code{1 x 2} with confidence limits.
+#' @export
+confint.cor_hermite <- function(object, parm, level = 0.95,
+                                method = c("fisher", "bootstrap"), B = 1000L, ...) {
+  method <- match.arg(method)
+  r <- object$r_hm
+  n <- object$n
+
+  if (method == "fisher") {
+    z_r <- atanh(r)
+    se <- 1 / sqrt(n - 3L)
+    crit <- stats::qnorm((1 + level) / 2)
+    ci <- tanh(z_r + c(-1, 1) * crit * se)
+  } else {
+    boot_vals <- numeric(B)
+    x <- object$x; y <- object$y
+    for (b in seq_len(B)) {
+      idx <- sample.int(n, n, replace = TRUE)
+      fb <- cor_hermite(x[idx], y[idx], poly_degree = object$poly_degree_requested,
+                        monotonicity = object$monotonicity, ties_method = object$ties_method)
+      boot_vals[b] <- fb$r_hm
+    }
+    alpha <- (1 - level) / 2
+    ci <- stats::quantile(boot_vals, probs = c(alpha, 1 - alpha), na.rm = TRUE)
+  }
+  matrix(ci, nrow = 1L, dimnames = list("r_HM", c(paste0(100 * (1 - level)/2, " %"),
+                                                  paste0(100 * (1 + level)/2, " %"))))
+}
+
+#' @export
+print.cor_hermite <- function(x, digits = 3L, ...) {
+  cat("\n  Hermite-Mehler Pearson Correlation (r_HM)\n")
+  cat(strrep("-", 48), "\n", sep = "")
+  cat(sprintf("  Hermite Correlation (r_HM) :  %.*f\n", digits, x$r_hm))
+  cat(sprintf("  Latent Copula (rho_z)      :  %.*f\n", digits, x$rho_z))
+  cat(sprintf("  Shape Attenuation (A)      :  %.*f\n", digits, x$attenuation))
+  cat(sprintf("  Polynomial Degrees Fitted  :  X = %d, Y = %d\n", x$degrees["x"], x$degrees["y"]))
+  cat(sprintf("  Monotonicity Check         :  %s\n", x$monotonicity))
+  if (!is.null(x$ci)) {
+    cat(sprintf("  %s CI (%s): [%.*f, %.*f]\n",
+                paste0(round(x$conf_level * 100), "%"), x$ci_method,
+                digits, x$ci[1L], digits, x$ci[2L]))
+  }
+  cat("\n")
+  invisible(x)
+}
+
+#' @export
+summary.cor_hermite <- function(object, digits = 3L, ...) {
+  print(object, digits = digits, ...)
+  cat("  Distributional Moments (Implied):\n")
+  cat(sprintf("    X: Mean = %.*f, SD = %.*f\n", digits, object$mean_x, digits, sqrt(object$var_x)))
+  cat(sprintf("    Y: Mean = %.*f, SD = %.*f\n", digits, object$mean_y, digits, sqrt(object$var_y)))
+  cat(sprintf("    Covariance(X, Y) = %.*f\n\n", digits, object$cov_xy))
+  invisible(object)
+}
+
+#' @export
+print.cor_hermite_matrix <- function(x, digits = 3L, ...) {
+  cat("\n  Hermite-Mehler Correlation Matrix (r_HM):\n")
+  print(round(x$r_hm, digits = digits))
+  cat("\n  Latent Copula Correlation Matrix (rho_z):\n")
+  print(round(x$rho_z, digits = digits))
+  cat("\n  Shape Attenuation Factor Matrix (A = r_HM / rho_z):\n")
+  print(round(x$attenuation, digits = digits))
+  cat("\n")
+  invisible(x)
+}
+
+
+
+plots.R
+#' Diagnostic Visualizations for hermiteStats Objects
+#'
+#' @param x An object of class \code{"d_reg"}, \code{"cor_hermite"}, or \code{"hermite_fit"}.
+#' @param ... Graphical parameters passed to base plotting functions.
+#'
+#' @export
+plot.d_reg <- function(x, ...) {
+  # Base R diagnostic plot showing empirical densities and modeled quantiles
+  oldpar <- graphics::par(no.readonly = TRUE)
+  on.exit(graphics::par(oldpar))
+  graphics::par(mfrow = c(1, 2))
+
+  # Plot Group 1
+  plot(x$fit1, main = "Group 1 Quantile Map", ...)
+  # Plot Group 2
+  plot(x$fit2, main = "Group 2 Quantile Map", ...)
+  invisible(x)
+}
+
+#' @export
+plot.cor_hermite <- function(x, ...) {
+  oldpar <- graphics::par(no.readonly = TRUE)
+  on.exit(graphics::par(oldpar))
+  graphics::par(mfrow = c(1, 2))
+
+  # Latent Copula Scatter
+  plot(x$fit_x$z, x$fit_y$z, pch = 19, col = grDevices::adjustcolor("steelblue", alpha.f = 0.6),
+       xlab = "Normal Scores Z(X)", ylab = "Normal Scores Z(Y)",
+       main = sprintf("Latent Copula (rho_z = %.3f)", x$rho_z), ...)
+  graphics::abline(h = 0, v = 0, lty = 2, col = "gray60")
+  graphics::abline(a = 0, b = x$rho_z, col = "darkblue", lwd = 2)
+
+  # Manifest Scaled Scatter
+  plot(x$x, x$y, pch = 19, col = grDevices::adjustcolor("coral", alpha.f = 0.6),
+       xlab = "Raw X", ylab = "Raw Y",
+       main = sprintf("Manifest r_HM = %.3f (A = %.2f)", x$r_hm, x$attenuation), ...)
+  invisible(x)
+}
+
+#' @export
+plot.hermite_fit <- function(x, main = "Fitted Quantile Map", ...) {
+  z_grid <- seq(min(x$z), max(x$z), length.out = 200L)
+  Zmat <- outer(z_grid, 0:x$degree, `^`)
+  x_pred <- as.vector(Zmat %*% x$beta)
+
+  plot(x$z, x$x, pch = 19, col = grDevices::adjustcolor("black", alpha.f = 0.4),
+       xlab = "Standard Normal Score (Z)", ylab = "Raw Values (X)",
+       main = paste0(main, " (Degree = ", x$degree, ")"), ...)
+  graphics::lines(z_grid, x_pred, col = "firebrick", lwd = 2.5)
+  invisible(x)
+}
+
+
+#' Exact Small-Sample Correction Factor J(df)
+#' @export
+.J_correction <- function(df) {
+  df <- max(df, 1.0001)
+  exp(lgamma(df / 2.0) - 0.5 * log(df / 2.0) - lgamma((df - 1.0) / 2.0))
+}
+
+#' Standardized Mean Differences (Cohen's d and Hedges' g)
+#'
+#' @param x1 Numeric vector of group 1 scores.
+#' @param x2 Numeric vector of group 2 scores.
+#' @param type Standardizer: \code{"pooled"} (default), \code{"avg"}, or \code{"glass"}.
+#' @param correct_bias Logical; apply Hedges' small-sample correction \eqn{J(df)}? Default is \code{TRUE}.
+#'
+#' @return Numeric scalar.
+#' @export
+d_cohen <- function(x1, x2, type = c("pooled", "avg", "glass"), correct_bias = TRUE) {
+  type <- match.arg(type)
+  n1 <- length(x1); n2 <- length(x2)
+  if (n1 < 2L || n2 < 2L) return(NA_real_)
+  s1 <- stats::sd(x1); s2 <- stats::sd(x2)
+  md <- mean(x2) - mean(x1)
+
+  if (type == "pooled") {
+    sdv <- sqrt(((n1 - 1L) * s1^2 + (n2 - 1L) * s2^2) / (n1 + n2 - 2L))
+    df  <- n1 + n2 - 2L
+  } else if (type == "avg") {
+    sdv <- sqrt((s1^2 + s2^2) / 2.0)
+    df  <- (s1^2/n1 + s2^2/n2)^2 / ((s1^2/n1)^2/(n1 - 1L) + (s2^2/n2)^2/(n2 - 1L))
+  } else {
+    sdv <- s1
+    df  <- n1 - 1L
+  }
+  if (sdv <= 0) return(0.0)
+  d <- md / sdv
+  if (correct_bias) d <- d * .J_correction(df)
+  d
+}
+
+#' @rdname d_cohen
+#' @export
+hedges_g <- function(x1, x2) {
+  d_cohen(x1, x2, type = "pooled", correct_bias = TRUE)
+}
+
+#' Noncentral-t (Lambda-Prime) Confidence Interval for SMD
+#' @export
+ci_nct <- function(d_point, n1, n2, conf = 0.95, df = n1 + n2 - 2L) {
+  n_tilde <- (n1 * n2) / (n1 + n2)
+  t_obs   <- d_point * sqrt(n_tilde)
+  a       <- (1 - conf) / 2
+
+  ncp_from_t <- function(t_val, df_val, p_val) {
+    f <- function(ncp) suppressWarnings(stats::pt(t_val, df = df_val, ncp = ncp)) - p_val
+    stats::uniroot(f, c(t_val - 6, t_val + 6), extendInt = "yes")$root
+  }
+
+  lo <- ncp_from_t(t_obs, df, 1 - a) / sqrt(n_tilde)
+  hi <- ncp_from_t(t_obs, df, a) / sqrt(n_tilde)
+  c(lower = lo, upper = hi)
+}
+
+benchmarks.R
+
+
+

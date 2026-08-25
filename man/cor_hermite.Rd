@@ -38,166 +38,178 @@ cor_hermite(x, ...)
 )
 }
 \arguments{
-\item{x}{A numeric vector, numeric \code{\link[base]{matrix}}, or \code{\link[base]{data.frame}}.}
+\item{x}{A numeric vector, numeric matrix, or data frame.}
 
 \item{...}{Additional arguments passed to methods.}
 
-\item{y}{A numeric vector (required if \code{x} is a vector; ignored if \code{x} is a matrix or data frame).}
+\item{y}{A numeric vector, required when \code{x} is a vector; ignored
+when \code{x} is a matrix or data frame.}
 
-\item{poly_degree}{Integer scalar; maximum polynomial degree for quantile function
-smoothing (default is \code{3L}). Must be an odd integer (\code{1}, \code{3}, or \code{5}).}
+\item{poly_degree}{Integer scalar; maximum polynomial degree used for the
+marginal quantile fits (default \code{3L}). Odd degrees (1, 3, 5) are
+recommended; see \code{\link{hermite_fit}}.}
 
-\item{monotonicity}{Character string specifying the monotonicity constraint:
+\item{monotonicity}{Monotonicity constraint passed to
+\code{\link{hermite_fit}}: \code{"relaxed"} (default), \code{"strict"},
+or \code{"none"}.}
+
+\item{ties_method}{Rank tie-handling method passed to
+\code{\link{hermite_fit}}: \code{"average"} (default) or \code{"random"}.}
+
+\item{conf_level}{Numeric value in \eqn{(0, 1)}, e.g. \code{0.95}, or
+\code{NULL} (default) to skip confidence interval calculation. Only used
+for the two-vector method.}
+
+\item{ci_method}{Confidence interval method for the two-vector case:
 \describe{
-  \item{\code{"relaxed"}}{(Default) Empirical rank concordance (\eqn{\rho_{\text{Spearman}} \ge 0.95}).
-    Preserves degrees well in discrete, psychometric, or count data.}
-  \item{\code{"strict"}}{Analytical root check of the first derivative (\eqn{\min f'(z) \ge 0}).}
-  \item{\code{"none"}}{Unconstrained OLS polynomial fit.}
+  \item{\code{"fisher"}}{(Default) Analytical Fisher \eqn{z}-transformation,
+    treating \eqn{r_{\mathrm{HM}}} like a Pearson correlation with standard
+    error \eqn{1/\sqrt{n-3}}. Fast, but approximate since it borrows the
+    sampling-variance behavior of the classical Pearson \eqn{r}.}
+  \item{\code{"bootstrap"}}{Non-parametric percentile bootstrap that
+    reruns the entire Hermite-Mehler pipeline (NQT, polynomial refit,
+    Mehler covariance) on each resample. Slower but makes no assumption
+    about the sampling distribution of \eqn{r_{\mathrm{HM}}}.}
 }}
 
-\item{ties_method}{Character string specifying the rank tie-handling method:
-\code{"average"} (default, midranks) or \code{"random"}.}
-
-\item{conf_level}{Numeric value in \eqn{(0, 1)} specifying the confidence level
-(e.g., \code{0.95} for a 95\% CI), or \code{NULL} (default) for point estimation only.}
-
-\item{ci_method}{Character string specifying the confidence interval calculation method:
-\describe{
-  \item{\code{"fisher"}}{(Default) Fast analytical Fisher \eqn{z}-transformation with
-    asymptotic standard error \eqn{\mathrm{SE} = 1/\sqrt{n - 3}}.}
-  \item{\code{"bootstrap"}}{Non-parametric percentile bootstrap refitting the full
-    Hermite-Mehler pipeline across resamples.}
-}}
-
-\item{B}{Integer scalar; number of bootstrap resamples if \code{ci_method = "bootstrap"}.
-Default is \code{1000L}.}
+\item{B}{Integer; number of bootstrap resamples when \code{ci_method = "bootstrap"}
+(default \code{1000L}).}
 }
 \value{
 For two vectors, an S3 object of class \code{"cor_hermite"} containing:
 \describe{
-  \item{\code{r_hm}}{Numeric; the regularized Hermite-Mehler Pearson correlation.}
-  \item{\code{rho_z}}{Numeric; the latent Gaussian copula correlation (Gaussian rank correlation).}
-  \item{\code{attenuation}}{Numeric; the shape attenuation factor \eqn{A = r_{\mathrm{HM}} / \rho_z}.}
-  \item{\code{cov_xy}}{Numeric; the regularized manifest covariance.}
-  \item{\code{var_x, var_y}}{Numeric; regularized manifest variances for \eqn{X} and \eqn{Y}.}
-  \item{\code{mean_x, mean_y}}{Numeric; regularized manifest means for \eqn{X} and \eqn{Y}.}
-  \item{\code{degrees}}{Named integer vector of realized polynomial degrees for \eqn{X} and \eqn{Y}.}
-  \item{\code{poly_degree_requested}}{Integer; requested maximum polynomial degree.}
-  \item{\code{monotonicity}}{Character; monotonicity method applied.}
-  \item{\code{ties_method}}{Character; tie-handling method applied.}
-  \item{\code{n}}{Integer; number of complete paired observations.}
-  \item{\code{fit_x, fit_y}}{The underlying \code{\link{hermite_fit}} objects.}
-  \item{\code{ci}}{Matrix containing confidence limits (if \code{conf_level} was specified).}
-  \item{\code{conf_level}}{Requested confidence level.}
-  \item{\code{ci_method}}{Method used for confidence interval estimation.}
+  \item{\code{r_hm}}{The Hermite-Mehler Pearson correlation.}
+  \item{\code{rho_z}}{The latent Gaussian copula correlation.}
+  \item{\code{attenuation}}{The shape attenuation factor \eqn{A = r_{\mathrm{HM}} / \rho_z}.}
+  \item{\code{cov_xy}}{The regularized manifest covariance.}
+  \item{\code{var_x, var_y}}{Regularized manifest variances of \eqn{X} and \eqn{Y}.}
+  \item{\code{mean_x, mean_y}}{Regularized manifest means of \eqn{X} and \eqn{Y}.}
+  \item{\code{degrees}}{Named integer vector of realized polynomial degrees.}
+  \item{\code{poly_degree_requested}}{Requested maximum polynomial degree.}
+  \item{\code{monotonicity}, \code{ties_method}}{Methods applied.}
+  \item{\code{n}}{Number of complete paired observations.}
+  \item{\code{fit_x}, \code{fit_y}}{The underlying \code{\link{hermite_fit}} objects.}
+  \item{\code{ci}, \code{conf_level}, \code{ci_method}}{Confidence interval results, if requested.}
 }
 
-For a matrix or data frame, an S3 object of class \code{"cor_hermite_matrix"} containing:
-\describe{
-  \item{\code{r_hm}}{Matrix of pairwise Hermite-Mehler correlations.}
-  \item{\code{rho_z}}{Matrix of pairwise latent copula correlations.}
-  \item{\code{attenuation}}{Matrix of pairwise shape attenuation factors.}
-  \item{\code{n}}{Integer; number of rows in the input dataset.}
-}
+For a matrix or data frame, an S3 object of class \code{"cor_hermite_matrix"} containing
+matrices \code{r_hm}, \code{rho_z}, \code{attenuation}, and the sample size \code{n}.
 }
 \description{
 Computes the distribution-robust Hermite-Mehler Pearson correlation (\eqn{r_{\mathrm{HM}}}),
-the latent Gaussian copula correlation (\eqn{\rho_z}), and the shape attenuation
-factor (\eqn{A}) for bivariate pairs or multivariate datasets.
+the latent Gaussian copula correlation (\eqn{\rho_z}), and the shape-attenuation
+factor (\eqn{A}) for a pair of variables, or for every pair of columns in a
+matrix or data frame.
 
-The method preserves the raw manifest Pearson correlation estimand on the original
-metric without changing the underlying parameter (unlike Spearman's \eqn{\rho},
-Kendall's \eqn{\tau}, or Gaussian rank correlations) and without discarding authentic
-tail variation (unlike trimming or Winsorization).
+Unlike Spearman's \eqn{\rho}, Kendall's \eqn{\tau}, or Gaussian rank correlation,
+\eqn{r_{\mathrm{HM}}} targets the same estimand as the classical Pearson
+correlation of the raw, manifest variables. Unlike trimming or Winsorizing,
+it does not discard authentic tail variance to achieve stability.
 }
 \details{
-\subsection{The Estimand Dilemma in Robust Correlation}{
-Classical Pearson's \eqn{r} suffers from severe sampling variance inflation when data
-depart from normality (e.g., skewness, heavy tails, outliers). Traditional robust
-alternatives solve this stability problem by changing the estimand:
+\subsection{Why not just use a robust rank correlation?}{
+Classical Pearson's \eqn{r} is highly sensitive to skewness, heavy tails, and
+outliers because it is driven by squared deviations on the raw scale. The
+usual robust alternatives regain stability by changing what is actually being
+estimated:
 \itemize{
-  \item \strong{Spearman's \eqn{\rho} and Kendall's \eqn{\tau}} evaluate rank concordance
-        rather than linear covariation, systematically underestimating Pearson's \eqn{r}
-        under bivariate normality (\eqn{\mathbb{E}[\rho_s] = \frac{6}{\pi}\arcsin(\rho/2)}).
-  \item \strong{Trimming / Winsorization} (e.g., percentage-bend, biweight midcorrelation)
-        amputates structural tail variance, altering the population covariance structure.
-  \item \strong{Gaussian Rank Correlation} evaluates the correlation on normalized latent
-        scores, yielding the copula correlation \eqn{\rho_z} rather than the raw manifest \eqn{r}.
+  \item \strong{Spearman's \eqn{\rho} / Kendall's \eqn{\tau}} quantify rank
+        concordance, not linear covariation; under bivariate normality
+        \eqn{E[\rho_s] = \frac{6}{\pi}\arcsin(\rho/2) \ne \rho}.
+  \item \strong{Trimming / Winsorizing} remove or shrink exactly the tail
+        observations that carry authentic covariance information.
+  \item \strong{Gaussian rank correlation} reports the copula correlation
+        \eqn{\rho_z} of the normalized scores, not the manifest Pearson \eqn{r}
+        of the original variables.
 }
 }
 
-\subsection{The Hermite-Mehler Pipeline}{
-The \code{cor_hermite} estimator resolves this dilemma in three steps:
+\subsection{The Hermite-Mehler pipeline}{
 \enumerate{
-  \item \strong{Rank-Based Inverse-Normal Transformation:} Both variables are mapped
-        to standard normal scores \eqn{Z_x, Z_y \sim \mathcal{N}(0, 1)}. The sample
-        correlation of these scores yields the latent Gaussian copula parameter \eqn{\rho_z}.
-  \item \strong{Monotone Quantile Polynomial Fitting:} The inverse quantile functions
-        \eqn{X = f(Z_x)} and \eqn{Y = g(Z_y)} are approximated via low-degree monotone
-        polynomials via OLS regression.
-  \item \strong{Closed-Form Mehler Expansion:} Polynomial coefficients are re-expressed
-        in the basis of orthogonal Probabilists' Hermite polynomials \eqn{He_m(z)}. By
-        Mehler's (1866) bilinear expansion:
-        \deqn{\mathbb{E}\left[ He_m(Z_x) He_n(Z_y) \right] = \delta_{mn} \, m! \, \rho_z^m}
-        All cross-terms of differing orders vanish. The covariance and variances are
-        obtained in exact algebraic form:
-        \deqn{\operatorname{Cov}(X, Y) = \sum_{m=1}^{\min(k_x, k_y)} a_m b_m \, m! \, \rho_z^m}
-        \deqn{\operatorname{Var}(X) = \sum_{m=1}^{k_x} a_m^2 \, m!, \quad \operatorname{Var}(Y) = \sum_{m=1}^{k_y} b_m^2 \, m!}
-        \deqn{r_{\mathrm{HM}} = \frac{\operatorname{Cov}(X, Y)}{\sqrt{\operatorname{Var}(X)\operatorname{Var}(Y)}}}
+  \item Both variables are mapped to standard normal scores \eqn{Z_x, Z_y}
+        via rank-based inverse-normal transformation. Their sample correlation
+        is the latent Gaussian copula parameter \eqn{\rho_z}.
+  \item The inverse quantile functions \eqn{X = f(Z_x)} and \eqn{Y = g(Z_y)}
+        are each approximated by a low-degree monotone polynomial
+        (\code{\link{hermite_fit}}).
+  \item The polynomial coefficients are re-expressed in the orthogonal
+        Probabilists' Hermite basis. Assuming \eqn{(Z_x, Z_y)} is bivariate
+        normal with correlation \eqn{\rho_z}, Mehler's (1866) bilinear
+        expansion gives
+        \deqn{E\left[He_m(Z_x) He_n(Z_y)\right] = \delta_{mn}\, m!\, \rho_z^m,}
+        so all cross-order terms vanish and the manifest covariance follows
+        in exact closed form:
+        \deqn{\mathrm{Cov}(X,Y) = \sum_{m=1}^{\min(k_x,k_y)} a_m b_m\, m!\, \rho_z^m,}
+        \deqn{\mathrm{Var}(X) = \sum_{m=1}^{k_x} a_m^2\, m!, \qquad
+              \mathrm{Var}(Y) = \sum_{m=1}^{k_y} b_m^2\, m!,}
+        \deqn{r_{\mathrm{HM}} = \frac{\mathrm{Cov}(X,Y)}{\sqrt{\mathrm{Var}(X)\,\mathrm{Var}(Y)}}.}
 }
 }
 
-\subsection{Shape Attenuation Factor (\eqn{A})}{
-When marginal distribution shapes differ (e.g., a normal variable paired with a lognormal
-latency), the mathematically achievable Pearson correlation is strictly bounded below \eqn{1.0}
-(Hoeffding-Fréchet bounds; Carroll, 1961). The ratio:
+\subsection{Shape attenuation factor A}{
+When the two marginal shapes differ substantially (e.g. a roughly symmetric
+variable paired with a strongly skewed one), the Hoeffding-Frechet bounds
+imply that the achievable Pearson correlation is strictly below 1 in
+absolute value, even for a perfect (\eqn{\rho_z = \pm 1}) latent association.
+The ratio
 \deqn{A = \frac{r_{\mathrm{HM}}}{\rho_z}}
-provides an interpretable diagnostic index. If \eqn{A \approx 1.0}, marginal shapes do not
-restrict the association. If \eqn{A \ll 1.0}, reporting a raw Pearson correlation severely
-understates the substantive construct association purely due to scale mismatch.
+quantifies this ceiling: \eqn{A \approx 1} indicates that marginal shape does
+not materially restrict the manifest association; \eqn{A \ll 1} indicates
+that a raw Pearson correlation would understate the underlying association
+largely because of scale/shape mismatch, not weak dependence.
+}
+
+\subsection{Matrices and missing data}{
+For matrix or data-frame input, each column's marginal quantile model is
+fitted once and reused for every pair it appears in, provided the input
+contains no missing or non-finite values. If missing values are present and
+differ in pattern across columns, \code{cor_hermite} instead falls back to
+exact pairwise-complete-case fitting for every pair (analogous to
+\code{stats::cor(..., use = "pairwise.complete.obs")}), since a single
+cached marginal fit per column would otherwise be evaluated over an
+inconsistent set of cases across pairs.
 }
 }
 \examples{
 # ---------------------------------------------------------
-# 1. Bivariate Correlation with Marginal Shape Mismatch
+# 1. Bivariate correlation with marginal shape mismatch
 # ---------------------------------------------------------
 set.seed(123)
 n <- 50
 z <- rnorm(n)
-x <- rnorm(n, mean = 100, sd = 15)           # Normally distributed
-y <- exp(0.5 * z + rnorm(n, sd = 0.5))        # Skewed lognormal latency
+x <- rnorm(n, mean = 100, sd = 15)            # symmetric
+y <- exp(0.5 * z + rnorm(n, sd = 0.5))         # skewed lognormal
 
-# Compute r_HM with 95\% Fisher-z CI
 r_fit <- cor_hermite(x, y, conf_level = 0.95, ci_method = "fisher")
 print(r_fit)
 summary(r_fit)
 
 # ---------------------------------------------------------
-# 2. Multivariate Correlation Matrix
+# 2. Correlation matrix (numeric columns only)
 # ---------------------------------------------------------
 data(iris)
 r_mat <- cor_hermite(iris[, 1:4])
 print(r_mat)
 
 # ---------------------------------------------------------
-# 3. Percentile Bootstrap Confidence Interval
+# 3. Percentile bootstrap confidence interval
 # ---------------------------------------------------------
 r_boot <- cor_hermite(x, y, conf_level = 0.95, ci_method = "bootstrap", B = 500)
 confint(r_boot)
 
 }
 \references{
-Carroll, J. B. (1961). The nature of the data, or how to choose a correlation coefficient. \emph{Psychometrika}, 26(4), 347–372. \doi{10.1007/BF02289768}
+Carroll, J. B. (1961). The nature of the data, or how to choose a correlation coefficient. \emph{Psychometrika}, 26(4), 347-372. \doi{10.1007/BF02289768}
 
-Fréchet, M. (1951). Sur les tableaux de corrélation dont les marges sont données. \emph{Annales de l'Université de Lyon}, 14, 53–77.
+Fréchet, M. (1951). Sur les tableaux de corrélation dont les marges sont données. \emph{Annales de l'Université de Lyon}, 14, 53-77.
 
-Hermite, C. (1864). Sur un nouveau développement en série des fonctions. \emph{Comptes Rendus de l'Académie des Sciences, Paris}, 58, 93–100.
+Hermite, C. (1864). Sur un nouveau développement en série des fonctions. \emph{Comptes Rendus de l'Académie des Sciences, Paris}, 58, 93-100.
 
-Hoeffding, W. (1940). Masstabinvariante Korrelationstheorie. \emph{Schriften des Mathematischen Instituts und des Instituts für Angewandte Mathematik der Universität Berlin}, 5, 181–233.
+Hoeffding, W. (1940). Massstabinvariante Korrelationstheorie. \emph{Schriften des Mathematischen Instituts und des Instituts für Angewandte Mathematik der Universität Berlin}, 5, 181-233.
 
-Lenhard, W., & Lenhard, A. (2026). The Hermite-Mehler Correlation: A Distribution-Robust Estimator of the Pearson Correlation Coefficient. \emph{Behavior Research Methods}. \doi{10.3758/s13428-xxx-xxxxx-x}
+Lenhard, W., & Lenhard, A. (in preparation). The Hermite-Mehler Correlation: A Distribution-Robust Estimator of the Pearson Correlation Coefficient.
 
-Mehler, F. G. (1866). Ueber die Entwicklung einer Function von beliebig vielen Variabeln nach Laplaceschen Functionen höherer Ordnung. \emph{Journal für die reine und angewandte Mathematik}, 66, 161–176. \doi{10.1515/crll.1866.66.161}
+Mehler, F. G. (1866). Ueber die Entwicklung einer Function von beliebig vielen Variabeln nach Laplaceschen Functionen höherer Ordnung. \emph{Journal für die reine und angewandte Mathematik}, 66, 161-176. \doi{10.1515/crll.1866.66.161}
 }
 \seealso{
 \code{\link{d_reg}}, \code{\link{hermite_fit}}, \code{\link{check_monotonicity}}

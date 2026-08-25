@@ -1,17 +1,25 @@
 #' @title Mathematical Core and Quantile Modeling Engine
 #'
 #' @description
-#' Low-level mathematical routines for rank-based inverse-normal quantile
-#' modeling, orthogonal Probabilists' Hermite polynomial basis transformations,
-#' analytical moment extraction via Isserlis' theorem, and monotonicity verification.
+#' Low-level routines that turn an empirical sample into a regularized,
+#' continuous quantile function and extract its population moments in closed
+#' algebraic form. These functions are the computational backbone shared by
+#' \code{\link{hermite_fit}}, \code{\link{cor_hermite}}, and \code{\link{d_reg}}.
 #'
 #' @details
-#' The functions in this module form the foundational mathematical backbone
-#' of \code{hermiteStats}. They provide the machinery to transform arbitrary
-#' continuous or finely graded empirical distributions into regularized,
-#' continuous quantile functions \eqn{X = f(Z)} defined over the standard normal
-#' domain \eqn{Z \sim \mathcal{N}(0, 1)}, and to derive their population moments
-#' (\eqn{\mu, \sigma^2, \sigma}) in exact closed algebraic form.
+#' Every distribution handled by \code{hermiteStats} is represented as a
+#' polynomial quantile function \eqn{X = f(Z)}, where \eqn{Z \sim \mathcal{N}(0,1)}
+#' is obtained from the data by rank-based inverse-normal transformation
+#' (Normal Quantile Transformation, NQT). Because \eqn{Z} is standard normal by
+#' construction, the coefficients of \eqn{f} can be re-expressed in the basis of
+#' monic Probabilists' Hermite polynomials \eqn{He_m(z)}, which are orthogonal
+#' under the standard normal measure:
+#' \deqn{E[He_m(Z) He_n(Z)] = \delta_{mn}\, m!}
+#' This orthogonality turns the extraction of the mean, variance, skewness, and
+#' kurtosis of \eqn{f(Z)} into simple, closed-form algebraic sums over the fitted
+#' coefficients, evaluated exactly via the raw moments \eqn{E[Z^j]} of the standard
+#' normal distribution (a direct consequence of Isserlis' 1918 theorem for Gaussian
+#' variables). No numerical integration is required at any stage.
 #'
 #' @name quantile_engine
 #' @keywords internal
@@ -22,11 +30,18 @@ NULL
 # Internal Helpers: Raw Normal Moments & Hermite Basis Operator
 # -----------------------------------------------------------------------------
 
-#' Compute Standard Normal Raw Moments E[Z^j]
+#' Raw moments of the standard normal distribution, E[Z^j]
+#'
+#' Returns \eqn{E[Z^0], E[Z^1], \dots, E[Z^{\text{max\_j}}]}. Odd-order moments
+#' are zero; even-order moments follow the double-factorial identity
+#' \eqn{E[Z^{2k}] = (2k-1)!!}, a direct consequence of Isserlis' (1918) theorem.
+#'
+#' @param max_j Integer; highest moment order required.
+#' @return Numeric vector of length \code{max_j + 1}, indexed from order 0.
 #' @noRd
 .z_raw_moments <- function(max_j) {
   moms <- numeric(max_j + 1L)
-  moms[1L] <- 1.0  # j = 0
+  moms[1L] <- 1.0  # E[Z^0]
   if (max_j >= 2L) {
     for (j in seq(2L, max_j, by = 2L)) {
       moms[j + 1L] <- prod(seq(j - 1L, 1L, by = -2L))
@@ -35,11 +50,25 @@ NULL
   moms
 }
 
-#' Matrix Operator for Monomial-to-Hermite Basis Conversion
+#' Change-of-basis matrix from monomials to monic Hermite polynomials
+#'
+#' Constructs the matrix \code{H} such that, for a polynomial given by monomial
+#' coefficients \code{beta} (i.e. \eqn{f(z) = \sum_j \beta_j z^j}), the vector
+#' \code{a = H \%*\% beta} holds the coefficients of the same polynomial expressed
+#' in the orthogonal Probabilists' Hermite basis, \eqn{f(z) = \sum_m a_m He_m(z)}.
+#' This re-expression is what allows the closed-form moment formulas in
+#' \code{.extract_all_moments()} to work.
+#'
+#' @param degree Integer; polynomial degree.
+#' @param z_moms Optional precomputed vector of standard normal raw moments
+#'   (as returned by \code{.z_raw_moments()}), of length at least
+#'   \code{2 * degree + 1}. Supplying this avoids redundant recomputation
+#'   when the caller already has the moments available.
+#' @return A \code{(degree + 1) x (degree + 1)} numeric matrix.
 #' @noRd
-.hermite_basis_matrix <- function(degree) {
+.hermite_basis_matrix <- function(degree, z_moms = NULL) {
+  if (is.null(z_moms)) z_moms <- .z_raw_moments(2L * degree)
   H_mat <- matrix(0.0, nrow = degree + 1L, ncol = degree + 1L)
-  z_moms <- .z_raw_moments(2L * degree)
   for (n in 0:degree) {
     for (m in 0:n) {
       if ((n - m) %% 2L == 0L) {
@@ -51,7 +80,19 @@ NULL
   H_mat
 }
 
-#' Compute Distributional Moments from Monomial Coefficients
+#' Closed-form distributional moments of a fitted quantile polynomial
+#'
+#' Given the monomial coefficients of a fitted quantile function
+#' \eqn{X = f(Z)}, returns its exact population mean, variance, skewness, and
+#' kurtosis under \eqn{Z \sim \mathcal{N}(0,1)}. Mean and variance are obtained
+#' directly from the orthogonal Hermite weights; skewness and kurtosis are
+#' obtained from the third and fourth central moments of the (centered)
+#' polynomial, evaluated via the raw Gaussian moments of \eqn{Z}.
+#'
+#' @param beta Numeric vector of monomial coefficients \eqn{(\beta_0, \dots, \beta_k)}.
+#' @return A list with elements \code{mean}, \code{variance}, \code{sd},
+#'   \code{skewness}, \code{excess_kurtosis}, \code{kurtosis}, and
+#'   \code{hermite_coeffs} (the orthogonal Hermite weights \eqn{a_0, \dots, a_k}).
 #' @noRd
 .extract_all_moments <- function(beta) {
   deg <- length(beta) - 1L
@@ -61,8 +102,12 @@ NULL
                 hermite_coeffs = numeric(0)))
   }
 
-  # Mean & Variance via Orthogonal Hermite Basis
-  H <- .hermite_basis_matrix(deg)
+  # All Gaussian raw moments needed below (up to order 4*deg) are computed once
+  # and shared between the basis change and the central-moment sums.
+  z_moms <- .z_raw_moments(4L * deg)
+
+  # Mean & variance via the orthogonal Hermite basis
+  H <- .hermite_basis_matrix(deg, z_moms = z_moms)
   a <- as.vector(H %*% beta)
   mean_val <- a[1L]
 
@@ -81,20 +126,17 @@ NULL
                 hermite_coeffs = a))
   }
 
-  # Centered Polynomial for 3rd and 4th Central Moments
+  # Centered monomial polynomial, used for the 3rd and 4th central moments
   beta_c <- beta
   beta_c[1L] <- beta_c[1L] - mean_val
 
-  # Precompute moments up to power 4 * deg
-  z_moms <- .z_raw_moments(4L * deg)
-
-  # 3rd Central Moment (mu3)
+  # 3rd central moment (mu3)
   idx3 <- outer(outer(0:deg, 0:deg, `+`), 0:deg, `+`)
   coef3 <- outer(outer(beta_c, beta_c), beta_c)
   mu3 <- sum(coef3 * z_moms[idx3 + 1L])
   skew_val <- mu3 / (sd_val^3)
 
-  # 4th Central Moment (mu4)
+  # 4th central moment (mu4)
   idx4 <- outer(outer(outer(0:deg, 0:deg, `+`), 0:deg, `+`), 0:deg, `+`)
   coef4 <- outer(outer(outer(beta_c, beta_c), beta_c), beta_c)
   mu4 <- sum(coef4 * z_moms[idx4 + 1L])
@@ -118,27 +160,49 @@ NULL
 
 #' Check Monotonicity of a Polynomial Quantile Function
 #'
-#' Evaluates whether a polynomial quantile function \eqn{X = f(Z)} is strictly or
-#' empirically monotonically increasing over a specified standard normal domain
-#' \eqn{[z_{\min}, z_{\max}]}.
+#' A fitted quantile function \eqn{X = f(Z)} must be non-decreasing to be a
+#' valid quantile function. Because unconstrained polynomial regression does
+#' not guarantee this, \code{check_monotonicity} verifies it after fitting, and
+#' \code{\link{hermite_fit}} uses it internally to decide whether to accept a
+#' given polynomial degree or step down to a lower one.
 #'
 #' @param coeffs Numeric vector of monomial coefficients \eqn{(\beta_0, \beta_1, \dots, \beta_k)}
-#'   representing the polynomial \eqn{f(z) = \sum_{j=0}^k \beta_j z^j}.
-#' @param z_range Numeric vector of length 2 specifying the interval \code{c(min_z, max_z)}
-#'   over which monotonicity is evaluated. Default is \code{c(-4, 4)}.
+#'   describing the polynomial \eqn{f(z) = \sum_{j=0}^k \beta_j z^j}.
+#' @param z_range Numeric vector of length 2, \code{c(min_z, max_z)}, giving the
+#'   domain over which monotonicity is evaluated. Default \code{c(-4, 4)}, which
+#'   covers essentially the entire probability mass for common sample sizes.
 #' @param method Character string specifying the verification criterion:
 #'   \describe{
-#'     \item{\code{"relaxed"}}{(Default) Evaluates empirical rank concordance
-#'       (\eqn{\rho_{\text{Spearman}} \ge 0.95}) between latent normal scores \eqn{z} and fitted
-#'       values \eqn{\hat{x} = f(z)}, combined with a positive linear slope (\eqn{\beta_1 > 0}).}
-#'     \item{\code{"strict"}}{Analytically computes the global minimum of the first derivative
-#'       \eqn{f'(z)} over \code{z_range} by extracting the roots of \eqn{f''(z)} via
-#'       \code{\link[stats]{polyroot}}. Requires \eqn{\min f'(z) \ge 0}.}
-#'     \item{\code{"none"}}{Bypasses monotonicity testing; always returns \code{TRUE}.}
+#'     \item{\code{"relaxed"}}{(Default) Checks that the fitted values
+#'       \eqn{\hat{x} = f(z)} rank-correlate with \eqn{z} at
+#'       \eqn{\rho_{\text{Spearman}} \ge 0.95} and that the linear coefficient
+#'       is positive (\eqn{\beta_1 > 0}). This tolerates tiny, practically
+#'       irrelevant non-monotonicities (e.g. from heavy ties) while rejecting
+#'       polynomials with genuine reversals.}
+#'     \item{\code{"strict"}}{Requires the first derivative \eqn{f'(z)} to be
+#'       non-negative everywhere on \code{z_range}. The global minimum of
+#'       \eqn{f'(z)} is found analytically by locating the roots of
+#'       \eqn{f''(z)} via \code{\link[stats]{polyroot}} and evaluating
+#'       \eqn{f'(z)} at these critical points and at the interval endpoints.}
+#'     \item{\code{"none"}}{Skips the check and always returns \code{TRUE}.
+#'       Useful for diagnostic purposes or when monotonicity is already
+#'       guaranteed (e.g. linear fits).}
 #'   }
-#' @param z Optional numeric vector of observed or evaluated standard normal scores.
+#' @param z Optional numeric vector of standard normal scores at which to
+#'   evaluate the \code{"relaxed"} criterion. If omitted, an evenly spaced
+#'   grid of 100 points over \code{z_range} is used instead.
 #'
-#' @return A list with logical element \code{is_monotonic} and diagnostic parameters.
+#' @return A list with elements \code{is_monotonic} (logical), \code{min_derivative}
+#'   (only computed for \code{method = "strict"}), \code{rank_concordance} (only
+#'   computed for \code{method = "relaxed"}), and \code{method}.
+#'
+#' @examples
+#' # A cubic polynomial that dips slightly but not enough to matter empirically
+#' check_monotonicity(c(0, 1, 0, 0.02), method = "relaxed")
+#'
+#' # The same polynomial checked analytically over the full domain
+#' check_monotonicity(c(0, 1, 0, 0.02), method = "strict")
+#'
 #' @export
 check_monotonicity <- function(coeffs, z_range = c(-4, 4),
                                method = c("relaxed", "strict", "none"),
@@ -206,44 +270,75 @@ check_monotonicity <- function(coeffs, z_range = c(-4, 4),
 
 #' Fit a Regularized Monotone Quantile Polynomial
 #'
-#' Maps empirical observations onto standard normal scores via rank-based
-#' inverse-normal transformation (Normal Quantile Transformation; NQT) and fits
-#' a regularized monotone polynomial quantile function \eqn{X = f(Z)}.
-#' Orthogonal Probabilists' Hermite polynomial weights and closed-form population
-#' moments (\eqn{\mu, \sigma^2, \sigma, \text{skewness } \gamma_1, \text{excess kurtosis } \gamma_2})
-#' are automatically extracted.
+#' Maps a numeric sample onto standard normal scores via rank-based
+#' inverse-normal transformation (NQT) and fits a low-degree, monotone
+#' polynomial quantile function \eqn{X = f(Z)} to these scores. The polynomial
+#' is re-expressed in the orthogonal Probabilists' Hermite basis, from which
+#' the population mean, variance, skewness, and excess kurtosis of the
+#' modeled distribution are obtained in closed algebraic form (no numerical
+#' integration, no distributional assumptions beyond the polynomial quantile
+#' model itself).
 #'
 #' @param x Numeric vector of observations. Missing and infinite values are
-#'   automatically removed.
-#' @param degree Integer scalar; maximum polynomial degree (default is \code{3}).
-#' @param monotonicity Monotonicity constraint: \code{"relaxed"} (default), \code{"strict"}, or \code{"none"}.
-#' @param ties_method Method for handling rank ties: \code{"average"} (default) or \code{"random"}.
-#' @param force_odd Logical; if \code{TRUE} (default), restricts polynomial degree to odd values.
+#'   removed automatically.
+#' @param degree Integer scalar; the maximum polynomial degree to attempt
+#'   (default \code{3}). The realized degree may be lower: it is capped by the
+#'   number of unique values in \code{x}, reduced further under heavy tying,
+#'   and stepped down whenever the fit fails the monotonicity check.
+#' @param monotonicity Monotonicity constraint passed to
+#'   \code{\link{check_monotonicity}}: \code{"relaxed"} (default), \code{"strict"},
+#'   or \code{"none"}.
+#' @param ties_method Method used to break rank ties before the inverse-normal
+#'   transform: \code{"average"} (default; midranks) or \code{"random"}.
+#' @param force_odd Logical; if \code{TRUE} (default), only odd polynomial
+#'   degrees (1, 3, 5, ...) are considered. Odd-degree polynomials are
+#'   antisymmetric-plus-symmetric combinations that most naturally accommodate
+#'   both skewed and symmetric quantile shapes without the boundary curvature
+#'   artifacts even-degree terms tend to introduce.
+#'
+#' @details
+#' The polynomial degree is chosen adaptively for each sample. Starting from
+#' the highest admissible degree, coefficients are estimated by ordinary least
+#' squares regression of \code{x} on powers of the normal scores \code{z}, and
+#' the fit is accepted if it passes the requested monotonicity check;
+#' otherwise the degree is reduced (by 2 if \code{force_odd = TRUE}, by 1
+#' otherwise) and refit, down to a linear (degree-1) fallback if necessary.
+#' This keeps the model as flexible as the data support while guaranteeing a
+#' valid, monotone quantile function.
 #'
 #' @return An S3 object of class \code{"hermite_fit"} containing:
 #' \describe{
 #'   \item{\code{beta}}{Fitted monomial coefficients \eqn{(\beta_0, \dots, \beta_k)}.}
-#'   \item{\code{hermite_coeffs}}{Orthogonal Probabilists' Hermite weights \eqn{(a_0, \dots, a_k)}.}
+#'   \item{\code{hermite_coeffs}}{Orthogonal Hermite weights \eqn{(a_0, \dots, a_k)}.}
 #'   \item{\code{degree}}{Realized polynomial degree.}
 #'   \item{\code{degree_requested}}{Requested polynomial degree.}
-#'   \item{\code{mean}}{Regularized population mean \eqn{\mu = a_0}.}
-#'   \item{\code{variance}}{Regularized population variance \eqn{\sigma^2 = \sum_{m=1}^k a_m^2 m!}.}
-#'   \item{\code{sd}}{Regularized population standard deviation \eqn{\sigma = \sqrt{\sigma^2}}.}
-#'   \item{\code{skewness}}{Regularized population skewness \eqn{\gamma_1 = \mu_3 / \sigma^3}.}
-#'   \item{\code{excess_kurtosis}}{Regularized population excess kurtosis \eqn{\gamma_2 = \mu_4 / \sigma^4 - 3}.}
-#'   \item{\code{kurtosis}}{Regularized raw Pearson kurtosis \eqn{\beta_2 = \mu_4 / \sigma^4}.}
+#'   \item{\code{mean}}{Regularized population mean, \eqn{\mu = a_0}.}
+#'   \item{\code{variance}}{Regularized population variance, \eqn{\sigma^2 = \sum_{m=1}^k a_m^2\, m!}.}
+#'   \item{\code{sd}}{Regularized population standard deviation, \eqn{\sigma = \sqrt{\sigma^2}}.}
+#'   \item{\code{skewness}}{Regularized population skewness, \eqn{\gamma_1 = \mu_3 / \sigma^3}.}
+#'   \item{\code{excess_kurtosis}}{Regularized population excess kurtosis, \eqn{\gamma_2 = \mu_4 / \sigma^4 - 3}.}
+#'   \item{\code{kurtosis}}{Regularized raw (Pearson) kurtosis, \eqn{\beta_2 = \mu_4 / \sigma^4}.}
 #'   \item{\code{n}}{Sample size.}
 #'   \item{\code{n_unique}}{Number of unique observations.}
-#'   \item{\code{tie_proportion}}{Proportion of tied values.}
-#'   \item{\code{monotonicity}}{Monotonicity check applied.}
+#'   \item{\code{tie_proportion}}{Proportion of tied values in the sample.}
+#'   \item{\code{monotonicity}}{Monotonicity constraint applied.}
 #'   \item{\code{ties_method}}{Tie-handling method applied.}
 #'   \item{\code{x}}{Cleaned input observations.}
 #'   \item{\code{z}}{Latent standard normal scores.}
 #' }
 #'
 #' @references
-#' Isserlis, L. (1918). On a formula for the product-moment coefficient of any order of a normal frequency distribution. \emph{Biometrika}, 12(1/2), 134–139. \doi{10.1093/biomet/12.1-2.134}
+#' Isserlis, L. (1918). On a formula for the product-moment coefficient of any order of a normal frequency distribution. \emph{Biometrika}, 12(1/2), 134-139. \doi{10.1093/biomet/12.1-2.134}
 #'
+#' @examples
+#' set.seed(1)
+#' x <- rlnorm(80, meanlog = 2, sdlog = 0.4)
+#' fit <- hermite_fit(x)
+#' print(fit)
+#' plot(fit)
+#'
+#' @seealso \code{\link{hermite_moments}}, \code{\link{check_monotonicity}},
+#'   \code{\link{cor_hermite}}, \code{\link{d_reg}}
 #' @export
 hermite_fit <- function(x, degree = 3L,
                         monotonicity = c("relaxed", "strict", "none"),
@@ -270,12 +365,16 @@ hermite_fit <- function(x, degree = 3L,
   z <- stats::qnorm(p)
   z_range <- range(z)
 
+  # Built once at the maximum candidate degree; lower-degree fits reuse the
+  # relevant leading columns instead of recomputing the power basis.
+  Zmat_full <- outer(z, 0:d_cap, `^`)
+
   cur_deg <- d_cap
   step <- if (force_odd) 2L else 1L
   beta_res <- NULL
 
   while (cur_deg >= 1L) {
-    Zmat <- outer(z, 0:cur_deg, `^`)
+    Zmat <- Zmat_full[, seq_len(cur_deg + 1L), drop = FALSE]
     beta <- tryCatch(qr.solve(Zmat, x_clean), error = function(e) rep(NA_real_, cur_deg + 1L))
 
     if (!any(is.na(beta))) {
@@ -290,7 +389,7 @@ hermite_fit <- function(x, degree = 3L,
 
   if (is.null(beta_res)) {
     cur_deg <- 1L
-    Zmat <- outer(z, 0:1, `^`)
+    Zmat <- Zmat_full[, 1:2, drop = FALSE]
     beta_res <- tryCatch(qr.solve(Zmat, x_clean), error = function(e) c(mean(x_clean), stats::sd(x_clean)))
   }
 
@@ -326,13 +425,21 @@ hermite_fit <- function(x, degree = 3L,
 
 #' Extract Regularized Distributional Moments
 #'
-#' Retrieves the regularized population moments (\eqn{\mu, \sigma^2, \sigma, \text{skewness } \gamma_1, \text{excess kurtosis } \gamma_2})
-#' derived from a fitted \code{hermite_fit} object.
+#' Convenience accessor that retrieves the regularized population moments
+#' (\eqn{\mu, \sigma^2, \sigma, \gamma_1, \gamma_2}) from a fitted
+#' \code{\link{hermite_fit}} object, without exposing the underlying
+#' polynomial coefficients.
 #'
-#' @param object An object of class \code{"hermite_fit"} returned by \code{\link{hermite_fit}}.
+#' @param object An object of class \code{"hermite_fit"} returned by
+#'   \code{\link{hermite_fit}}.
 #'
-#' @return A named list containing \code{mean}, \code{variance}, \code{sd},
+#' @return A named list with elements \code{mean}, \code{variance}, \code{sd},
 #'   \code{skewness}, \code{excess_kurtosis}, and \code{kurtosis}.
+#'
+#' @examples
+#' fit <- hermite_fit(rnorm(50))
+#' hermite_moments(fit)
+#'
 #' @export
 hermite_moments <- function(object) {
   if (!inherits(object, "hermite_fit")) {
@@ -352,6 +459,12 @@ hermite_moments <- function(object) {
 # S3 Methods: print and summary
 # -----------------------------------------------------------------------------
 
+#' Print a Fitted Hermite Quantile Model
+#'
+#' @param x An object of class \code{"hermite_fit"}.
+#' @param digits Integer; number of decimal places to display.
+#' @param ... Additional arguments (currently unused).
+#' @return The object \code{x}, invisibly.
 #' @export
 print.hermite_fit <- function(x, digits = 3L, ...) {
   cat("\n  Regularized Quantile Model (Hermite Basis)\n")
@@ -369,6 +482,12 @@ print.hermite_fit <- function(x, digits = 3L, ...) {
   invisible(x)
 }
 
+#' Summarize a Fitted Hermite Quantile Model
+#'
+#' @param object An object of class \code{"hermite_fit"}.
+#' @param digits Integer; number of decimal places to display.
+#' @param ... Additional arguments (currently unused).
+#' @return The object \code{object}, invisibly.
 #' @export
 summary.hermite_fit <- function(object, digits = 3L, ...) {
   print(object, digits = digits, ...)

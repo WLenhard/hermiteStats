@@ -14,46 +14,80 @@ hermite_fit(
 }
 \arguments{
 \item{x}{Numeric vector of observations. Missing and infinite values are
-automatically removed.}
+removed automatically.}
 
-\item{degree}{Integer scalar; maximum polynomial degree (default is \code{3}).}
+\item{degree}{Integer scalar; the maximum polynomial degree to attempt
+(default \code{3}). The realized degree may be lower: it is capped by the
+number of unique values in \code{x}, reduced further under heavy tying,
+and stepped down whenever the fit fails the monotonicity check.}
 
-\item{monotonicity}{Monotonicity constraint: \code{"relaxed"} (default), \code{"strict"}, or \code{"none"}.}
+\item{monotonicity}{Monotonicity constraint passed to
+\code{\link{check_monotonicity}}: \code{"relaxed"} (default), \code{"strict"},
+or \code{"none"}.}
 
-\item{ties_method}{Method for handling rank ties: \code{"average"} (default) or \code{"random"}.}
+\item{ties_method}{Method used to break rank ties before the inverse-normal
+transform: \code{"average"} (default; midranks) or \code{"random"}.}
 
-\item{force_odd}{Logical; if \code{TRUE} (default), restricts polynomial degree to odd values.}
+\item{force_odd}{Logical; if \code{TRUE} (default), only odd polynomial
+degrees (1, 3, 5, ...) are considered. Odd-degree polynomials are
+antisymmetric-plus-symmetric combinations that most naturally accommodate
+both skewed and symmetric quantile shapes without the boundary curvature
+artifacts even-degree terms tend to introduce.}
 }
 \value{
 An S3 object of class \code{"hermite_fit"} containing:
 \describe{
   \item{\code{beta}}{Fitted monomial coefficients \eqn{(\beta_0, \dots, \beta_k)}.}
-  \item{\code{hermite_coeffs}}{Orthogonal Probabilists' Hermite weights \eqn{(a_0, \dots, a_k)}.}
+  \item{\code{hermite_coeffs}}{Orthogonal Hermite weights \eqn{(a_0, \dots, a_k)}.}
   \item{\code{degree}}{Realized polynomial degree.}
   \item{\code{degree_requested}}{Requested polynomial degree.}
-  \item{\code{mean}}{Regularized population mean \eqn{\mu = a_0}.}
-  \item{\code{variance}}{Regularized population variance \eqn{\sigma^2 = \sum_{m=1}^k a_m^2 m!}.}
-  \item{\code{sd}}{Regularized population standard deviation \eqn{\sigma = \sqrt{\sigma^2}}.}
-  \item{\code{skewness}}{Regularized population skewness \eqn{\gamma_1 = \mu_3 / \sigma^3}.}
-  \item{\code{excess_kurtosis}}{Regularized population excess kurtosis \eqn{\gamma_2 = \mu_4 / \sigma^4 - 3}.}
-  \item{\code{kurtosis}}{Regularized raw Pearson kurtosis \eqn{\beta_2 = \mu_4 / \sigma^4}.}
+  \item{\code{mean}}{Regularized population mean, \eqn{\mu = a_0}.}
+  \item{\code{variance}}{Regularized population variance, \eqn{\sigma^2 = \sum_{m=1}^k a_m^2\, m!}.}
+  \item{\code{sd}}{Regularized population standard deviation, \eqn{\sigma = \sqrt{\sigma^2}}.}
+  \item{\code{skewness}}{Regularized population skewness, \eqn{\gamma_1 = \mu_3 / \sigma^3}.}
+  \item{\code{excess_kurtosis}}{Regularized population excess kurtosis, \eqn{\gamma_2 = \mu_4 / \sigma^4 - 3}.}
+  \item{\code{kurtosis}}{Regularized raw (Pearson) kurtosis, \eqn{\beta_2 = \mu_4 / \sigma^4}.}
   \item{\code{n}}{Sample size.}
   \item{\code{n_unique}}{Number of unique observations.}
-  \item{\code{tie_proportion}}{Proportion of tied values.}
-  \item{\code{monotonicity}}{Monotonicity check applied.}
+  \item{\code{tie_proportion}}{Proportion of tied values in the sample.}
+  \item{\code{monotonicity}}{Monotonicity constraint applied.}
   \item{\code{ties_method}}{Tie-handling method applied.}
   \item{\code{x}}{Cleaned input observations.}
   \item{\code{z}}{Latent standard normal scores.}
 }
 }
 \description{
-Maps empirical observations onto standard normal scores via rank-based
-inverse-normal transformation (Normal Quantile Transformation; NQT) and fits
-a regularized monotone polynomial quantile function \eqn{X = f(Z)}.
-Orthogonal Probabilists' Hermite polynomial weights and closed-form population
-moments (\eqn{\mu, \sigma^2, \sigma, \text{skewness } \gamma_1, \text{excess kurtosis } \gamma_2})
-are automatically extracted.
+Maps a numeric sample onto standard normal scores via rank-based
+inverse-normal transformation (NQT) and fits a low-degree, monotone
+polynomial quantile function \eqn{X = f(Z)} to these scores. The polynomial
+is re-expressed in the orthogonal Probabilists' Hermite basis, from which
+the population mean, variance, skewness, and excess kurtosis of the
+modeled distribution are obtained in closed algebraic form (no numerical
+integration, no distributional assumptions beyond the polynomial quantile
+model itself).
+}
+\details{
+The polynomial degree is chosen adaptively for each sample. Starting from
+the highest admissible degree, coefficients are estimated by ordinary least
+squares regression of \code{x} on powers of the normal scores \code{z}, and
+the fit is accepted if it passes the requested monotonicity check;
+otherwise the degree is reduced (by 2 if \code{force_odd = TRUE}, by 1
+otherwise) and refit, down to a linear (degree-1) fallback if necessary.
+This keeps the model as flexible as the data support while guaranteeing a
+valid, monotone quantile function.
+}
+\examples{
+set.seed(1)
+x <- rlnorm(80, meanlog = 2, sdlog = 0.4)
+fit <- hermite_fit(x)
+print(fit)
+plot(fit)
+
 }
 \references{
-Isserlis, L. (1918). On a formula for the product-moment coefficient of any order of a normal frequency distribution. \emph{Biometrika}, 12(1/2), 134–139. \doi{10.1093/biomet/12.1-2.134}
+Isserlis, L. (1918). On a formula for the product-moment coefficient of any order of a normal frequency distribution. \emph{Biometrika}, 12(1/2), 134-139. \doi{10.1093/biomet/12.1-2.134}
+}
+\seealso{
+\code{\link{hermite_moments}}, \code{\link{check_monotonicity}},
+  \code{\link{cor_hermite}}, \code{\link{d_reg}}
 }

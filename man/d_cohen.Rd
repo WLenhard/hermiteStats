@@ -3,24 +3,61 @@
 \name{d_cohen}
 \alias{d_cohen}
 \alias{hedges_g}
-\title{Standardized Mean Differences (Cohen's d and Hedges' g)}
+\title{Standardized Mean Differences (Cohen's d Family)}
 \usage{
 d_cohen(x1, x2, type = c("pooled", "avg", "glass"), correct_bias = TRUE)
 
 hedges_g(x1, x2)
 }
 \arguments{
-\item{x1}{Numeric vector of group 1 scores.}
+\item{x1}{Numeric vector of Group 1 (baseline) scores.}
 
-\item{x2}{Numeric vector of group 2 scores.}
+\item{x2}{Numeric vector of Group 2 (comparison) scores.}
 
-\item{type}{Standardizer: \code{"pooled"} (default), \code{"avg"}, or \code{"glass"}.}
+\item{type}{Character string selecting the standardizer:
+\describe{
+  \item{\code{"pooled"}}{(Default) Pooled within-group standard
+    deviation, \eqn{s_p = \sqrt{[(n_1-1)s_1^2 + (n_2-1)s_2^2]/(n_1+n_2-2)}}
+    — the classical Cohen's \eqn{d} / Hedges' \eqn{g} standardizer.}
+  \item{\code{"avg"}}{Unweighted root-mean-square of the two group
+    variances, \eqn{\sqrt{(s_1^2+s_2^2)/2}}, with degrees of freedom
+    approximated via the Welch-Satterthwaite equation. Recommended when
+    group variances are expected to differ (Delacre et al., 2021).}
+  \item{\code{"glass"}}{Glass's \eqn{\Delta}: standardizes by the Group 1
+    (baseline) standard deviation only, appropriate when Group 1 alone
+    represents the reference population variance (e.g. an untreated
+    control group).}
+}}
 
-\item{correct_bias}{Logical; apply Hedges' small-sample correction \eqn{J(df)}? Default is \code{TRUE}.}
+\item{correct_bias}{Logical; if \code{TRUE} (default), multiplies the raw
+ratio by \code{\link{hedges_correction}}, yielding an (approximately)
+unbiased estimator.}
 }
 \value{
-Numeric scalar.
+Numeric scalar. Returns \code{NA_real_} if either group has fewer
+  than 2 observations, and \code{NA_real_} with a warning if the
+  standardizer is zero, negative, or non-finite (i.e. the ratio is
+  mathematically undefined).
 }
 \description{
-Standardized Mean Differences (Cohen's d and Hedges' g)
+Computes classical, sample-moment-based standardized mean differences,
+primarily as benchmark comparisons for the regularized
+\code{\link{d_reg}} estimator.
+}
+\examples{
+set.seed(1)
+g1 <- rnorm(20, mean = 0)
+g2 <- rnorm(20, mean = 0.5)
+d_cohen(g1, g2)                       # pooled-SD Hedges' g (bias-corrected)
+d_cohen(g1, g2, type = "glass")       # Glass's Delta
+d_cohen(g1, g2, correct_bias = FALSE) # uncorrected Cohen's d
+
+}
+\references{
+Delacre, M., Lakens, D., Ley, C., Liu, L., & Leys, C. (2021). Why Hedges' gs based on the non-pooled standard deviation should be reported with Welch's t-test. \emph{Preprint}. \doi{10.31234/osf.io/tu6mp}
+
+Hedges, L. V. (1981). Distribution theory for Glass's estimator of effect size and related estimators. \emph{Journal of Educational Statistics}, 6(2), 107-128. \doi{10.3102/10769986006002107}
+}
+\seealso{
+\code{\link{hedges_g}}, \code{\link{d_reg}}, \code{\link{hedges_correction}}
 }

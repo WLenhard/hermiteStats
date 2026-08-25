@@ -5,6 +5,8 @@ export(d_reg)
 export(hedges_g)
 export(hermite_fit)
 export(hermite_moments)
+export(ci_nct)
+export(hedges_correction)
 
 S3method(confint, cor_hermite)
 S3method(confint, d_reg)

@@ -2,10 +2,53 @@
 % Please edit documentation in R/benchmarks.R
 \name{ci_nct}
 \alias{ci_nct}
-\title{Noncentral-t (Lambda-Prime) Confidence Interval for SMD}
+\title{Noncentral-t (Lambda-Prime) Confidence Interval for a Standardized Mean Difference}
 \usage{
-ci_nct(d_point, n1, n2, conf = 0.95, df = n1 + n2 - 2L)
+ci_nct(d_point, n1, n2, conf = 0.95, df = n1 + n2 - 2L, n_tilde = NULL)
+}
+\arguments{
+\item{d_point}{Numeric; the observed standardized mean difference.}
+
+\item{n1}{Integer; sample size of Group 1 (or the number of pairs, for
+paired designs).}
+
+\item{n2}{Integer; sample size of Group 2.}
+
+\item{conf}{Numeric; confidence level (default \code{0.95}).}
+
+\item{df}{Numeric; degrees of freedom of the standardizer. Defaults to
+\eqn{n_1+n_2-2} (independent two-sample, pooled- or averaged-SD case).}
+
+\item{n_tilde}{Numeric or \code{NULL}; the effective sample size entering
+\eqn{t_{\mathrm{obs}} = d\sqrt{\tilde n}}. If \code{NULL} (default),
+the two-sample harmonic form \eqn{\tilde n = n_1 n_2/(n_1+n_2)} is used,
+appropriate for an independent-groups difference standardized by a
+pooled or averaged SD. Supply \code{n_tilde} explicitly for other
+designs: \code{n_tilde = n1} together with \code{df = n1 - 1} for a
+paired-sample \eqn{d_z} (\eqn{n_1} pairs) or for Glass's \eqn{\Delta}
+(standardized by the Group 1 SD alone).}
+}
+\value{
+A named numeric vector \code{c(lower, upper)}.
 }
 \description{
-Noncentral-t (Lambda-Prime) Confidence Interval for SMD
+Computes an analytical confidence interval for a standardized mean
+difference by inverting the noncentral \eqn{t} distribution (the
+"lambda-prime" method: Steiger & Fouladi, 1997; Lecoutre, 2007). Given an
+observed point estimate, the method numerically solves for the two
+noncentrality parameters whose sampling distributions place the observed
+test statistic at the \eqn{\alpha/2} and \eqn{1-\alpha/2} quantiles.
+}
+\examples{
+# Independent two-sample Cohen's d (default two-sample n_tilde)
+ci_nct(d_point = 0.5, n1 = 30, n2 = 30)
+
+# Paired-sample d_z: n_tilde and df both based on the number of pairs
+ci_nct(d_point = 0.5, n1 = 30, n2 = 30, df = 29, n_tilde = 30)
+
+}
+\references{
+Lecoutre, B. (2007). Another look at the confidence intervals for the noncentral T distribution. \emph{Journal of Modern Applied Statistical Methods}, 6(1), 107-116. \doi{10.22237/jmasm/1177992600}
+
+Steiger, J. H., & Fouladi, R. T. (1997). Noncentrality interval estimation and the evaluation of statistical models. In L. L. Harlow, S. A. Mulaik, & J. H. Steiger (Eds.), \emph{What if there were no significance tests?} (pp. 221-257). Lawrence Erlbaum Associates.
 }

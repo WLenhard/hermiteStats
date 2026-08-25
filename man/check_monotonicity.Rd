@@ -13,29 +13,51 @@ check_monotonicity(
 }
 \arguments{
 \item{coeffs}{Numeric vector of monomial coefficients \eqn{(\beta_0, \beta_1, \dots, \beta_k)}
-representing the polynomial \eqn{f(z) = \sum_{j=0}^k \beta_j z^j}.}
+describing the polynomial \eqn{f(z) = \sum_{j=0}^k \beta_j z^j}.}
 
-\item{z_range}{Numeric vector of length 2 specifying the interval \code{c(min_z, max_z)}
-over which monotonicity is evaluated. Default is \code{c(-4, 4)}.}
+\item{z_range}{Numeric vector of length 2, \code{c(min_z, max_z)}, giving the
+domain over which monotonicity is evaluated. Default \code{c(-4, 4)}, which
+covers essentially the entire probability mass for common sample sizes.}
 
 \item{method}{Character string specifying the verification criterion:
 \describe{
-  \item{\code{"relaxed"}}{(Default) Evaluates empirical rank concordance
-    (\eqn{\rho_{\text{Spearman}} \ge 0.95}) between latent normal scores \eqn{z} and fitted
-    values \eqn{\hat{x} = f(z)}, combined with a positive linear slope (\eqn{\beta_1 > 0}).}
-  \item{\code{"strict"}}{Analytically computes the global minimum of the first derivative
-    \eqn{f'(z)} over \code{z_range} by extracting the roots of \eqn{f''(z)} via
-    \code{\link[stats]{polyroot}}. Requires \eqn{\min f'(z) \ge 0}.}
-  \item{\code{"none"}}{Bypasses monotonicity testing; always returns \code{TRUE}.}
+  \item{\code{"relaxed"}}{(Default) Checks that the fitted values
+    \eqn{\hat{x} = f(z)} rank-correlate with \eqn{z} at
+    \eqn{\rho_{\text{Spearman}} \ge 0.95} and that the linear coefficient
+    is positive (\eqn{\beta_1 > 0}). This tolerates tiny, practically
+    irrelevant non-monotonicities (e.g. from heavy ties) while rejecting
+    polynomials with genuine reversals.}
+  \item{\code{"strict"}}{Requires the first derivative \eqn{f'(z)} to be
+    non-negative everywhere on \code{z_range}. The global minimum of
+    \eqn{f'(z)} is found analytically by locating the roots of
+    \eqn{f''(z)} via \code{\link[stats]{polyroot}} and evaluating
+    \eqn{f'(z)} at these critical points and at the interval endpoints.}
+  \item{\code{"none"}}{Skips the check and always returns \code{TRUE}.
+    Useful for diagnostic purposes or when monotonicity is already
+    guaranteed (e.g. linear fits).}
 }}
 
-\item{z}{Optional numeric vector of observed or evaluated standard normal scores.}
+\item{z}{Optional numeric vector of standard normal scores at which to
+evaluate the \code{"relaxed"} criterion. If omitted, an evenly spaced
+grid of 100 points over \code{z_range} is used instead.}
 }
 \value{
-A list with logical element \code{is_monotonic} and diagnostic parameters.
+A list with elements \code{is_monotonic} (logical), \code{min_derivative}
+  (only computed for \code{method = "strict"}), \code{rank_concordance} (only
+  computed for \code{method = "relaxed"}), and \code{method}.
 }
 \description{
-Evaluates whether a polynomial quantile function \eqn{X = f(Z)} is strictly or
-empirically monotonically increasing over a specified standard normal domain
-\eqn{[z_{\min}, z_{\max}]}.
+A fitted quantile function \eqn{X = f(Z)} must be non-decreasing to be a
+valid quantile function. Because unconstrained polynomial regression does
+not guarantee this, \code{check_monotonicity} verifies it after fitting, and
+\code{\link{hermite_fit}} uses it internally to decide whether to accept a
+given polynomial degree or step down to a lower one.
+}
+\examples{
+# A cubic polynomial that dips slightly but not enough to matter empirically
+check_monotonicity(c(0, 1, 0, 0.02), method = "relaxed")
+
+# The same polynomial checked analytically over the full domain
+check_monotonicity(c(0, 1, 0, 0.02), method = "strict")
+
 }

@@ -2,7 +2,7 @@
 % Please edit documentation in R/cor_hermite.R
 \name{confint.cor_hermite}
 \alias{confint.cor_hermite}
-\title{Confidence Intervals for Hermite Correlation}
+\title{Confidence Intervals for the Hermite-Mehler Correlation}
 \usage{
 \method{confint}{cor_hermite}(
   object,
@@ -16,20 +16,19 @@
 \arguments{
 \item{object}{An object of class \code{"cor_hermite"}.}
 
-\item{parm}{Ignored.}
+\item{parm}{Ignored (present for S3 consistency with \code{\link[stats]{confint}}).}
 
-\item{level}{Numeric scalar; confidence level (default is \code{0.95}).}
+\item{level}{Numeric scalar; confidence level (default \code{0.95}).}
 
 \item{method}{Character; \code{"fisher"} (default) or \code{"bootstrap"}.}
 
-\item{B}{Integer; number of bootstrap replications (default is \code{1000L}).}
+\item{B}{Integer; number of bootstrap replications (default \code{1000L}).}
 
-\item{...}{Additional arguments.}
+\item{...}{Additional arguments (currently unused).}
 }
 \value{
-A matrix of dimension \code{1 x 2} with confidence limits.
+A \code{1 x 2} matrix of confidence limits.
 }
 \description{
-Computes analytical Fisher \eqn{z} or non-parametric percentile bootstrap
-confidence intervals for \code{cor_hermite} objects.
+Confidence Intervals for the Hermite-Mehler Correlation
 }

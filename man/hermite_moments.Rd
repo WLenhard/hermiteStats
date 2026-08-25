@@ -7,13 +7,21 @@
 hermite_moments(object)
 }
 \arguments{
-\item{object}{An object of class \code{"hermite_fit"} returned by \code{\link{hermite_fit}}.}
+\item{object}{An object of class \code{"hermite_fit"} returned by
+\code{\link{hermite_fit}}.}
 }
 \value{
-A named list containing \code{mean}, \code{variance}, \code{sd},
+A named list with elements \code{mean}, \code{variance}, \code{sd},
   \code{skewness}, \code{excess_kurtosis}, and \code{kurtosis}.
 }
 \description{
-Retrieves the regularized population moments (\eqn{\mu, \sigma^2, \sigma, \text{skewness } \gamma_1, \text{excess kurtosis } \gamma_2})
-derived from a fitted \code{hermite_fit} object.
+Convenience accessor that retrieves the regularized population moments
+(\eqn{\mu, \sigma^2, \sigma, \gamma_1, \gamma_2}) from a fitted
+\code{\link{hermite_fit}} object, without exposing the underlying
+polynomial coefficients.
+}
+\examples{
+fit <- hermite_fit(rnorm(50))
+hermite_moments(fit)
+
 }
