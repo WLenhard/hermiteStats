@@ -21,7 +21,7 @@ knitr::opts_chunk$set(
 [![R-CMD-check](https://github.com/WLenhard/hermiteStats/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/WLenhard/hermiteStats/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 
-**`hermiteStats`** provides distribution-robust, regularized estimators for two of the most fundamental statistics in quantitative research:
+**`hermiteStats`** provides distribution-robust, regularized estimators for distributional moments (mean, variance, skewness and kurtosis) and based on this, for two of the most fundamental statistics in quantitative research:
 
 1. **The Hermite-Mehler Correlation (r_HM):** a distribution-robust estimator of the raw-scale Pearson correlation coefficient.
 2. **The Distribution-Free Effect Size (d_reg):** a robust standardized mean difference for independent and paired samples that retains the metric and interpretation of Cohen's *d* / Hedges' *g*.

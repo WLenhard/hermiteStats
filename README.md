@@ -13,7 +13,9 @@ MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.or
 <!-- badges: end -->
 
 **`hermiteStats`** provides distribution-robust, regularized estimators
-for two of the most fundamental statistics in quantitative research:
+for distributional moments (mean, variance, skewness and kurtosis) and
+based on this, for two of the most fundamental statistics in
+quantitative research:
 
 1.  **The Hermite-Mehler Correlation (r_HM):** a distribution-robust
     estimator of the raw-scale Pearson correlation coefficient.
