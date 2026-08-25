@@ -30,7 +30,7 @@ covers essentially the entire probability mass for common sample sizes.}
   \item{\code{"strict"}}{Requires the first derivative \eqn{f'(z)} to be
     non-negative everywhere on \code{z_range}. The global minimum of
     \eqn{f'(z)} is found analytically by locating the roots of
-    \eqn{f''(z)} via \code{\link[stats]{polyroot}} and evaluating
+    \eqn{f''(z)} via polyroot and evaluating
     \eqn{f'(z)} at these critical points and at the interval endpoints.}
   \item{\code{"none"}}{Skips the check and always returns \code{TRUE}.
     Useful for diagnostic purposes or when monotonicity is already

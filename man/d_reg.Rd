@@ -9,7 +9,7 @@
 d_reg(x, ...)
 
 \method{d_reg}{formula}(
-  formula,
+  x,
   data = NULL,
   degree = 3L,
   monotonicity = c("relaxed", "strict", "none"),

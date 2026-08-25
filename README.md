@@ -9,6 +9,7 @@
 experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html)
 [![License:
 MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![R-CMD-check](https://github.com/WLenhard/hermiteStats/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/WLenhard/hermiteStats/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 
 **`hermiteStats`** provides distribution-robust, regularized estimators

@@ -6,11 +6,11 @@ Authors@R: c(
     person("Wolfgang", "Lenhard", 
            email = "wolfgang.lenhard@uni-wuerzburg.de", 
            role = c("aut", "cre"),
-           comment = c(ORCID = "0000-0002-2321-7299")),
+           comment = c(ORCID = "0000-0002-8184-6889")),
     person("Alexandra", "Lenhard", 
-           email = "alexandra.lenhard@psychometrica.de",
+           email = "lenhard@psychometrica.de",
            role = c("aut"),
-           comment = c(ORCID = "0000-0002-5309-8472"))
+           comment = c(ORCID = "0000-0001-8680-4381"))
   )
 Description: Provides distribution-robust estimation and statistical inference
     for bivariate correlations and standardized mean differences (effect sizes)
@@ -42,11 +42,6 @@ Imports:
     graphics,
     grDevices,
     stats
-Suggests:
-    knitr,
-    rmarkdown,
-    testthat (>= 3.0.0)
 URL: https://github.com/WLenhard/hermiteStats
 BugReports: https://github.com/WLenhard/hermiteStats/issues
-VignetteBuilder: knitr
 Config/roxygen2/version: 8.0.0

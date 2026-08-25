@@ -176,7 +176,7 @@ d_reg <- function(x, ...) {
 
 #' @rdname d_reg
 #' @export
-d_reg.formula <- function(formula, data = NULL, degree = 3L,
+d_reg.formula <- function(x, data = NULL, degree = 3L,
                           monotonicity = c("relaxed", "strict", "none"),
                           paired = FALSE,
                           type = c("regularized", "hedges", "glass", "combined"),
@@ -184,10 +184,10 @@ d_reg.formula <- function(formula, data = NULL, degree = 3L,
                           ci_method = c("bootstrap", "nct"),
                           B = 1000L, ...) {
 
-  if (missing(formula) || (length(formula) != 3L)) {
+  if (missing(x) || (length(x) != 3L)) {
     stop("Formula must be of the form 'response ~ group'.")
   }
-  mf <- stats::model.frame(formula = formula, data = data)
+  mf <- stats::model.frame(formula = x, data = data)
   response <- mf[[1L]]
   group <- as.factor(mf[[2L]])
 
