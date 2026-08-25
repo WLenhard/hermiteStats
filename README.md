@@ -254,6 +254,17 @@ x <- rlnorm(40, meanlog = 3, sdlog = 0.5)  # right-skewed, heavy-tailed data
 
 fit <- hermite_fit(x)
 print(fit)
+#> 
+#>   Regularized Quantile Model (Hermite Basis)
+#> ---------------------------------------------
+#>   Modeled Mean (mu)      :  23.449
+#>   Modeled SD (sigma)     :  13.875
+#>   Modeled Variance       :  192.527
+#>   Modeled Skewness (g1)  :  1.314
+#>   Excess Kurtosis (g2)   :  2.552
+#>   Fitted Polynomial Deg  :  3 (requested: 3)
+#>   Sample Size (n)        :  40 (unique: 40, ties: 0.0%)
+#>   Monotonicity Check     :  relaxed
 ```
 
 `hermite_moments()` returns the same regularized moments as a plain
@@ -261,6 +272,23 @@ list, convenient for programmatic use:
 
 ``` r
 hermite_moments(fit)
+#> $mean
+#> [1] 23.44885
+#> 
+#> $variance
+#> [1] 192.527
+#> 
+#> $sd
+#> [1] 13.87541
+#> 
+#> $skewness
+#> [1] 1.314325
+#> 
+#> $excess_kurtosis
+#> [1] 2.551613
+#> 
+#> $kurtosis
+#> [1] 5.551613
 ```
 
 `summary()` additionally shows the fitted monomial coefficients and the
@@ -268,6 +296,25 @@ orthogonal Hermite weights the moments above were derived from:
 
 ``` r
 summary(fit)
+#> 
+#>   Regularized Quantile Model (Hermite Basis)
+#> ---------------------------------------------
+#>   Modeled Mean (mu)      :  23.449
+#>   Modeled SD (sigma)     :  13.875
+#>   Modeled Variance       :  192.527
+#>   Modeled Skewness (g1)  :  1.314
+#>   Excess Kurtosis (g2)   :  2.552
+#>   Fitted Polynomial Deg  :  3 (requested: 3)
+#>   Sample Size (n)        :  40 (unique: 40, ties: 0.0%)
+#>   Monotonicity Check     :  relaxed
+#> 
+#>   Polynomial Coefficients (Monomial raw beta):
+#>    z^0    z^1    z^2    z^3 
+#> 20.481 12.831  2.968  0.130 
+#> 
+#>   Orthogonal Hermite Weights (a_m):
+#>   He_0   He_1   He_2   He_3 
+#> 23.449 13.222  2.968  0.130
 ```
 
 For comparison, the raw sample mean and standard deviation on the same
@@ -275,7 +322,9 @@ data:
 
 ``` r
 mean(x)
+#> [1] 23.35619
 sd(x)
+#> [1] 13.7519
 ```
 
 In a clean, moderately sized continuous sample like this one, the
@@ -301,6 +350,15 @@ y <- exp(0.4 * z_shared + rnorm(n, sd = 0.5))    # right-skewed (lognormal)
 
 fit_cor <- cor_hermite(x, y, conf_level = 0.95, ci_method = "fisher")
 print(fit_cor)
+#> 
+#>   Hermite-Mehler Pearson Correlation (r_HM)
+#> ------------------------------------------------
+#>   Hermite Correlation (r_HM) :  0.571
+#>   Latent Copula (rho_z)      :  0.631
+#>   Shape Attenuation (A)      :  0.905
+#>   Polynomial Degrees Fitted  :  X = 3, Y = 3
+#>   Monotonicity Check         :  relaxed
+#>   95% CI (fisher): [0.371, 0.720]
 ```
 
 `rho_z` is the latent Gaussian copula correlation; `r_HM` is the
@@ -322,6 +380,27 @@ pairwise matrices — useful as a drop-in, shape-robust alternative to
 ``` r
 R_hermite <- cor_hermite(iris[, 1:4])
 print(R_hermite)
+#> 
+#>   Hermite-Mehler Correlation Matrix (r_HM):
+#>              Sepal.Length Sepal.Width Petal.Length Petal.Width
+#> Sepal.Length        1.000      -0.091        0.842       0.744
+#> Sepal.Width        -0.091       1.000       -0.258      -0.224
+#> Petal.Length        0.842      -0.258        1.000       0.844
+#> Petal.Width         0.744      -0.224        0.844       1.000
+#> 
+#>   Latent Copula Correlation Matrix (rho_z):
+#>              Sepal.Length Sepal.Width Petal.Length Petal.Width
+#> Sepal.Length        1.000      -0.093        0.868       0.777
+#> Sepal.Width        -0.093       1.000       -0.269      -0.237
+#> Petal.Length        0.868      -0.269        1.000       0.864
+#> Petal.Width         0.777      -0.237        0.864       1.000
+#> 
+#>   Shape Attenuation Factor Matrix (A = r_HM / rho_z):
+#>              Sepal.Length Sepal.Width Petal.Length Petal.Width
+#> Sepal.Length        1.000       0.987        0.971       0.958
+#> Sepal.Width         0.987       1.000        0.960       0.944
+#> Petal.Length        0.971       0.960        1.000       0.976
+#> Petal.Width         0.958       0.944        0.976       1.000
 ```
 
 ### Distribution-Free Effect Sizes (d_reg)
@@ -341,6 +420,16 @@ df_study <- data.frame(
 
 fit_d <- d_reg(score ~ group, data = df_study, conf_level = 0.95, ci_method = "bootstrap")
 print(fit_d)
+#> 
+#>   Distribution-Free Effect Size Estimation (d_reg)
+#> ----------------------------------------------------
+#>   Effect Size (d_reg)               :  0.879
+#>   Standardizer Used (denominator)   :  5.382
+#>   Hedges' g (Benchmark)             :  0.884
+#>   Sample Sizes                      :  n1 = 25, n2 = 25
+#>   Polynomial Degrees                :  g1 = 3, g2 = 3
+#>   Monotonicity Check                :  relaxed
+#>   95% CI (bootstrap): [0.388, 1.378]
 ```
 
 You can as well directly compare two variables with `d_reg(x, y)`.
@@ -362,6 +451,20 @@ post <- pre + rnorm(30, mean = 5.0, sd = 2.0)
 
 fit_paired <- d_reg(pre, post, paired = TRUE, conf_level = 0.95)
 print(fit_paired)
+#> 
+#>   Distribution-Free Effect Size Estimation (d_reg)
+#> ----------------------------------------------------
+#>   Effect Size (d_reg, raw scale)    :  0.406
+#>   Standardized Mean Change (d_z)    :  3.188
+#>   Paired Hermite Correlation (r_HM) :  0.930
+#>   Averaged Model SD (sigma_avg)     :  12.505
+#>   Difference Model SD (sigma_diff)  :  1.592
+#>   Standardizer Used (denominator)   :  12.505
+#>   Hedges' g (Benchmark)             :  0.399
+#>   Sample Sizes                      :  n1 = 30, n2 = 30
+#>   Polynomial Degrees                :  g1 = 3, g2 = 3
+#>   Monotonicity Check                :  relaxed
+#>   95% CI (bootstrap): [2.535, 4.261]
 ```
 
 `d_reg` (raw scale) is directly comparable to independent-groups effect
@@ -383,6 +486,8 @@ moments:
 plot(fit)
 ```
 
+<img src="man/figures/README-unnamed-chunk-12-1.png" alt="" width="100%" />
+
 A `cor_hermite` fit shows the latent copula on the left, and the
 manifest association on the right — with both the model-implied
 conditional mean curve (exact, via Mehler’s identity) and a purely
@@ -394,6 +499,8 @@ constant-correlation copula assumption:
 plot(fit_cor)
 ```
 
+<img src="man/figures/README-unnamed-chunk-13-1.png" alt="" width="100%" />
+
 A `d_reg` fit shows both groups’ empirical densities (with regularized
 means and the effect size annotated) alongside their regularized
 quantile maps overlaid on a single panel:
@@ -401,6 +508,8 @@ quantile maps overlaid on a single panel:
 ``` r
 plot(fit_d)
 ```
+
+<img src="man/figures/README-unnamed-chunk-14-1.png" alt="" width="100%" />
 
 ## Citation
 

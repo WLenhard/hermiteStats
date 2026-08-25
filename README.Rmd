@@ -147,7 +147,7 @@ The package depends only on base R (`graphics`, `grDevices`, `stats`) and requir
 
 ## Quick Start and Examples
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 library(hermiteStats)
 ```
 
@@ -155,7 +155,7 @@ library(hermiteStats)
 
 At the core of the package is `hermite_fit()`, which maps a numeric vector onto standard normal scores, fits a regularized monotone polynomial quantile function, and extracts the population mean, variance, skewness, and excess kurtosis in exact closed algebraic form — without needing a separate package for higher-order moments, and without the instability of raw sample skewness/kurtosis estimators in small or heavy-tailed samples.
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 set.seed(42)
 x <- rlnorm(40, meanlog = 3, sdlog = 0.5)  # right-skewed, heavy-tailed data
 
@@ -166,7 +166,7 @@ print(fit)
 
 `hermite_moments()` returns the same regularized moments as a plain list, convenient for programmatic use:
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 hermite_moments(fit)
 ```
 
@@ -174,13 +174,13 @@ hermite_moments(fit)
 `summary()` additionally shows the fitted monomial coefficients and the orthogonal Hermite weights the moments above were derived from:
 
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 summary(fit)
 ```
 
 For comparison, the raw sample mean and standard deviation on the same data:
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 mean(x)
 sd(x)
 ```
@@ -193,7 +193,7 @@ In a clean, moderately sized continuous sample like this one, the regularized an
 
 `cor_hermite()` estimates the raw-scale Pearson correlation between two variables that may have very different marginal shapes — here, a roughly normal construct and a skewed, lognormal latency, both driven by a shared latent factor:
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 set.seed(42)
 n <- 60
 z_shared <- rnorm(n)
@@ -212,7 +212,7 @@ print(fit_cor)
 
 For more than two variables, `cor_hermite()` dispatches to a matrix/data-frame method, returning all three quantities as full pairwise matrices — useful as a drop-in, shape-robust alternative to `cor()` ahead of factor analysis, SEM, or meta-analytic synthesis:
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 R_hermite <- cor_hermite(iris[, 1:4])
 print(R_hermite)
 ```
@@ -221,7 +221,7 @@ print(R_hermite)
 
 `d_reg()` estimates a standardized mean difference that keeps Cohen's *d* metric and interpretation, but is far less sensitive to skewness and small-sample instability. It accepts either two vectors or, as here, a formula interface:
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 set.seed(123)
 df_study <- data.frame(
   score = c(rlnorm(25, meanlog = 2.0, sdlog = 0.5),   # Control (skewed)
@@ -239,7 +239,7 @@ You can as well directly compare two variables with `d_reg(x, y)`. Alongside `d_
 
 For within-subject designs, `paired = TRUE` fits the marginal distributions *and* the observed difference-score distribution, reporting both the raw-scale effect size and the standardized mean change:
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 set.seed(7)
 pre  <- rlnorm(30, meanlog = 3.0, sdlog = 0.4)
 post <- pre + rnorm(30, mean = 5.0, sd = 2.0)
@@ -256,19 +256,19 @@ Every model object has a `plot()` method, so the regularization step is never a 
 
 A single fitted quantile model shows the empirical normal scores against the raw data, overlaid with the fitted polynomial and its regularized moments:
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 plot(fit)
 ```
 
 A `cor_hermite` fit shows the latent copula on the left, and the manifest association on the right — with both the model-implied conditional mean curve (exact, via Mehler's identity) and a purely empirical lowess smooth, so that curvature attributable to marginal shape can be visually distinguished from a genuine departure from the constant-correlation copula assumption:
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 plot(fit_cor)
 ```
 
 A `d_reg` fit shows both groups' empirical densities (with regularized means and the effect size annotated) alongside their regularized quantile maps overlaid on a single panel:
 
-```{r, eval = FALSE}
+```{r, eval = TRUE}
 plot(fit_d)
 ```
 
