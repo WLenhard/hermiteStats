@@ -5,9 +5,6 @@
 
 <!-- badges: start -->
 
-[![R-CMD-check](https://github.com/WLenhard/hermiteStats/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/WLenhard/hermiteStats/actions/workflows/R-CMD-check.yaml)
-[![CRAN
-status](https://www.r-pkg.org/badges/version/hermiteStats)](https://CRAN.R-project.org/package=hermiteStats)
 [![Lifecycle:
 experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html)
 [![License:
