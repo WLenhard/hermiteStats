@@ -105,7 +105,7 @@ latent standard normal scores $Z \sim \mathcal{N}(0, 1)$ using a
 rank-based inverse-normal transformation (Normal Quantile
 Transformation; e.g. Hazen, 1914):
 
-$$Z_{x, i} = \Phi^{-1}\left(\frac{\operatorname{rank}(X_i) - 0.5}{n}\right), \quad Z_{y, i} = \Phi^{-1}\left(\frac{\operatorname{rank}(Y_i) - 0.5}{n}\right)$$
+$$Z_{x, i} = \Phi^{-1}\left(\frac{\text{rank}(X_i) - 0.5}{n}\right), \quad Z_{y, i} = \Phi^{-1}\left(\frac{\text{rank}(Y_i) - 0.5}{n}\right)$$
 
 Unlike a plain rank transform, this step is only a means to an end: the
 inverse quantile functions $X = f(Z_x)$ and $Y = g(Z_y)$ are then
@@ -140,7 +140,7 @@ $$H_{m+1, n+1} = \binom{n}{2k} (2k - 1)!! \quad \text{for } 2k = n - m \ge 0 \te
 The mean and variance then follow immediately from the Hermite
 coefficients:
 
-$$\mathbb{E}[X] = a_0, \qquad \operatorname{Var}(X) = \sum_{m=1}^{k_x} a_m^2 \, m!$$
+$$\mathbb{E}[X] = a_0, \qquad \text{Var}(X) = \sum_{m=1}^{k_x} a_m^2 \, m!$$
 
 Skewness $\gamma_1$ and excess kurtosis $\gamma_2$ follow analogously
 from the third and fourth central moments of the fitted polynomial,
@@ -156,10 +156,10 @@ with no numerical integration at any step.
 ### 3. Mehler’s Bilinear Expansion for Covariance
 
 Under a latent Gaussian copula with latent correlation
-$\rho_z = \operatorname{cor}(Z_x, Z_y)$, **Mehler’s (1866) identity**
-states that cross-products of Hermite polynomials of different order
-vanish in expectation, and matching orders collapse to a single
-deterministic power of $\rho_z$:
+$\rho_z = \text{cor}(Z_x, Z_y)$, **Mehler’s (1866) identity** states
+that cross-products of Hermite polynomials of different order vanish in
+expectation, and matching orders collapse to a single deterministic
+power of $\rho_z$:
 
 $$\mathbb{E}\left[ He_m(Z_x) He_n(Z_y) \right] = \delta_{mn} \, m! \, \rho_z^m$$
 
@@ -167,7 +167,7 @@ The manifest covariance is therefore the sum over matching Hermite
 orders of the two fitted quantile polynomials ($\mathbf{a}$ for $X$,
 $\mathbf{b}$ for $Y$):
 
-$$\operatorname{Cov}(X, Y) = \sum_{m=1}^{\min(k_x, k_y)} a_m b_m \, m! \, \rho_z^m$$
+$$\text{Cov}(X, Y) = \sum_{m=1}^{\min(k_x, k_y)} a_m b_m \, m! \, \rho_z^m$$
 
 which, combined with the univariate variances from Section 2, yields the
 **Hermite-Mehler correlation (r_HM)**:
