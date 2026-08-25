@@ -411,20 +411,20 @@ repository for updated publication details (journal, volume, DOI) once
 available.
 
 ``` bibtex
-@Manual{lenhard2025hermiteStatsPkg,
+@Manual{lenhard2026hermiteStatsPkg,
   title  = {{hermiteStats}: Distribution-Robust Statistics via Hermite Polynomial Quantile Modeling},
   author = {Wolfgang Lenhard and Alexandra Lenhard},
-  year   = {2025},
+  year   = {2026},
   note   = {R package version 0.1.0},
   url    = {https://github.com/WLenhard/hermiteStats}
 }
-@Unpublished{lenhard2025hermite,
+@Unpublished{lenhard2026hermite,
   title  = {The {Hermite-Mehler} Correlation: A Distribution-Robust Estimator of the {Pearson} Correlation Coefficient},
   author = {Wolfgang Lenhard and Alexandra Lenhard},
   note   = {Manuscript submitted for publication}
 }
 
-@Unpublished{lenhard2025dreg,
+@Unpublished{lenhard2026dreg,
   title  = {Distribution-Free Effect Size Estimation: A Robust Alternative to {Cohen's d} and Other Effect Size Estimators},
   author = {Wolfgang Lenhard and Alexandra Lenhard},
   note   = {Manuscript submitted for publication}

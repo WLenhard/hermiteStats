@@ -1,0 +1,40 @@
+citHeader("To cite hermiteStats in publications, please use:")
+
+c(
+  bibentry(
+    bibtype = "Manual",
+    key     = "lenhard2026hermiteStatsPkg",
+    title   = "{hermiteStats}: Distribution-Robust Statistics via Hermite Polynomial Quantile Modeling",
+    author  = c(
+      person(given = "Wolfgang", family = "Lenhard", email = "wolfgang.lenhard@uni-wuerzburg.de"),
+      person(given = "Alexandra", family = "Lenhard")
+    ),
+    year    = "2026",
+    note    = "R package version 0.1.0",
+    url     = "https://github.com/WLenhard/hermiteStats"
+  ),
+
+  bibentry(
+    bibtype = "Unpublished",
+    key     = "lenhard2026hermite",
+    title   = "The {Hermite-Mehler} Correlation: A Distribution-Robust Estimator of the {Pearson} Correlation Coefficient",
+    author  = c(
+      person(given = "Wolfgang", family = "Lenhard"),
+      person(given = "Alexandra", family = "Lenhard")
+    ),
+    year    = "2026",
+    note    = "Manuscript submitted for publication"
+  ),
+
+  bibentry(
+    bibtype = "Unpublished",
+    key     = "lenhard2026dreg",
+    title   = "Distribution-Free Effect Size Estimation: A Robust Alternative to {Cohen's d} and Other Effect Size Estimators",
+    author  = c(
+      person(given = "Wolfgang", family = "Lenhard"),
+      person(given = "Alexandra", family = "Lenhard")
+    ),
+    year    = "2026",
+    note    = "Manuscript submitted for publication"
+  )
+)
