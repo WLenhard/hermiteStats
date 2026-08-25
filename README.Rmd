@@ -144,3 +144,169 @@ remotes::install_github(\"WLenhard/hermiteStats\")
 ```
 
 The package depends only on base R (`graphics`, `grDevices`, `stats`) and requires R >= 3.5.0 — there are no heavyweight dependencies to resolve.
+
+
+## Quick Start and Examples
+
+```{r, eval = FALSE}
+library(hermiteStats)
+```
+
+### Estimating Distributional Moments
+
+At the core of the package is `hermite_fit()`, which maps a numeric vector onto standard normal scores, fits a regularized monotone polynomial quantile function, and extracts the population mean, variance, skewness, and excess kurtosis in exact closed algebraic form — without needing a separate package for higher-order moments, and without the instability of raw sample skewness/kurtosis estimators in small or heavy-tailed samples.
+
+```{r, eval = FALSE}
+set.seed(42)
+x <- rlnorm(40, meanlog = 3, sdlog = 0.5)  # right-skewed, heavy-tailed data
+
+fit <- hermite_fit(x)
+print(fit)
+```
+
+
+`hermite_moments()` returns the same regularized moments as a plain list, convenient for programmatic use:
+
+```{r, eval = FALSE}
+hermite_moments(fit)
+```
+
+
+`summary()` additionally shows the fitted monomial coefficients and the orthogonal Hermite weights the moments above were derived from:
+
+
+```{r, eval = FALSE}
+summary(fit)
+```
+
+For comparison, the raw sample mean and standard deviation on the same data:
+
+```{r, eval = FALSE}
+mean(x)
+sd(x)
+```
+
+In a clean, moderately sized continuous sample like this one, the regularized and raw estimates are expected to agree closely — `hermite_fit()`'s advantage shows up primarily in small samples, tied or contaminated data, and whenever skewness/kurtosis are of direct interest, as the remaining examples below illustrate.
+
+
+
+### Hermite-Mehler Correlation (r_HM)
+
+`cor_hermite()` estimates the raw-scale Pearson correlation between two variables that may have very different marginal shapes — here, a roughly normal construct and a skewed, lognormal latency, both driven by a shared latent factor:
+
+```{r, eval = FALSE}
+set.seed(42)
+n <- 60
+z_shared <- rnorm(n)
+
+x <- 100 + 15 * z_shared + rnorm(n, sd = 5)      # approximately normal
+y <- exp(0.4 * z_shared + rnorm(n, sd = 0.5))    # right-skewed (lognormal)
+
+fit_cor <- cor_hermite(x, y, conf_level = 0.95, ci_method = "fisher")
+print(fit_cor)
+```
+
+`rho_z` is the latent Gaussian copula correlation; `r_HM` is the corresponding raw-scale Pearson correlation implied by the fitted marginal shapes; and `A = r_HM / rho_z` quantifies how much of that latent association survives on the manifest scale (see [Mathematical Foundations §4](#4-disentangling-construct-association-from-scale-attenuation-a)). `summary(fit_cor)` additionally reports the implied means, standard deviations, and covariance on the raw scale.
+
+
+### Correlation Matrices and Multivariate Analysis
+
+For more than two variables, `cor_hermite()` dispatches to a matrix/data-frame method, returning all three quantities as full pairwise matrices — useful as a drop-in, shape-robust alternative to `cor()` ahead of factor analysis, SEM, or meta-analytic synthesis:
+
+```{r, eval = FALSE}
+R_hermite <- cor_hermite(iris[, 1:4])
+print(R_hermite)
+```
+
+### Distribution-Free Effect Sizes (d_reg)
+
+`d_reg()` estimates a standardized mean difference that keeps Cohen's *d* metric and interpretation, but is far less sensitive to skewness and small-sample instability. It accepts either two vectors or, as here, a formula interface:
+
+```{r, eval = FALSE}
+set.seed(123)
+df_study <- data.frame(
+  score = c(rlnorm(25, meanlog = 2.0, sdlog = 0.5),   # Control (skewed)
+            rlnorm(25, meanlog = 2.4, sdlog = 0.5)),  # Treatment
+  group = factor(rep(c("Control", "Treatment"), each = 25))
+)
+
+fit_d <- d_reg(score ~ group, data = df_study, conf_level = 0.95, ci_method = "bootstrap")
+print(fit_d)
+```
+
+You can as well directly compare two variables with `d_reg(x, y)`. Alongside `d_reg`, the object also carries the classical Hedges' *g* benchmark and, on request, a percentile bootstrap confidence interval; `summary(fit_d)` reports the regularized moments underlying both groups.
+
+### Paired and Repeated-Measures Designs
+
+For within-subject designs, `paired = TRUE` fits the marginal distributions *and* the observed difference-score distribution, reporting both the raw-scale effect size and the standardized mean change:
+
+```{r, eval = FALSE}
+set.seed(7)
+pre  <- rlnorm(30, meanlog = 3.0, sdlog = 0.4)
+post <- pre + rnorm(30, mean = 5.0, sd = 2.0)
+
+fit_paired <- d_reg(pre, post, paired = TRUE, conf_level = 0.95)
+print(fit_paired)
+```
+
+`d_reg` (raw scale) is directly comparable to independent-groups effect sizes, e.g. in a meta-analysis mixing designs; `d_z` is standardized by the variability of the change scores themselves and will be larger whenever the paired Hermite-Mehler correlation is strong (see [Mathematical Foundations §5](#5-distribution-free-effect-size-d_reg)).
+
+### Diagnostic Visualizations
+
+Every model object has a `plot()` method, so the regularization step is never a black box.
+
+A single fitted quantile model shows the empirical normal scores against the raw data, overlaid with the fitted polynomial and its regularized moments:
+
+```{r, eval = FALSE}
+plot(fit)
+```
+
+A `cor_hermite` fit shows the latent copula on the left, and the manifest association on the right — with both the model-implied conditional mean curve (exact, via Mehler's identity) and a purely empirical lowess smooth, so that curvature attributable to marginal shape can be visually distinguished from a genuine departure from the constant-correlation copula assumption:
+
+```{r, eval = FALSE}
+plot(fit_cor)
+```
+
+A `d_reg` fit shows both groups' empirical densities (with regularized means and the effect size annotated) alongside their regularized quantile maps overlaid on a single panel:
+
+```{r, eval = FALSE}
+plot(fit_d)
+```
+
+
+## Citation
+If you use `hermiteStats` in published research, please cite both the software and the manuscripts describing the two estimators. Both manuscripts are currently under peer review; please check the package repository for updated publication details (journal, volume, DOI) once available.
+
+```bibtex
+@Manual{lenhard2025hermiteStatsPkg,
+  title  = {{hermiteStats}: Distribution-Robust Statistics via Hermite Polynomial Quantile Modeling},
+  author = {Wolfgang Lenhard and Alexandra Lenhard},
+  year   = {2025},
+  note   = {R package version 0.1.0},
+  url    = {https://github.com/WLenhard/hermiteStats}
+}
+@Unpublished{lenhard2025hermite,
+  title  = {The {Hermite-Mehler} Correlation: A Distribution-Robust Estimator of the {Pearson} Correlation Coefficient},
+  author = {Wolfgang Lenhard and Alexandra Lenhard},
+  note   = {Manuscript submitted for publication}
+}
+
+@Unpublished{lenhard2025dreg,
+  title  = {Distribution-Free Effect Size Estimation: A Robust Alternative to {Cohen's d} and Other Effect Size Estimators},
+  author = {Wolfgang Lenhard and Alexandra Lenhard},
+  note   = {Manuscript submitted for publication}
+}
+```
+
+## References
+
+* Carroll, J. B. (1961). The nature of the data, or how to choose a correlation coefficient. *Psychometrika*, 26(4), 347–372. https://doi.org/10.1007/BF02289768
+* Cohen, J. (1988). *Statistical Power Analysis for the Behavioral Sciences* (2nd ed.). Lawrence Erlbaum Associates.
+* Hazen, A. (1914). Storage to be provided in impounding municipal water supply. *Transactions of the American Society of Civil Engineers*, 77(1), 1539–1640.
+* Hedges, L. V. (1981). Distribution theory for Glass's estimator of effect size and related estimators. *Journal of Educational Statistics*, 6(2), 107–128. https://doi.org/10.3102/10769986006002107
+* Hermite, C. (1864). Sur un nouveau développement en série des fonctions. *Comptes Rendus de l'Académie des Sciences, Paris*, 58, 93–100.
+* Isserlis, L. (1918). On a formula for the product-moment coefficient of any order of a normal frequency distribution. *Biometrika*, 12(1/2), 134–139. https://doi.org/10.1093/biomet/12.1-2.134
+* Mehler, F. G. (1866). Ueber die Entwicklung einer Function von beliebig vielen Variabeln nach Laplaceschen Functionen höherer Ordnung. *Journal für die reine und angewandte Mathematik*, 66, 161–176. https://doi.org/10.1515/crll.1866.66.161
+* Sklar, M. (1959). Fonctions de répartition à n dimensions et leurs marges. *Publications de l'Institut de Statistique de l'Université de Paris*, 8, 229–231.
+
+---
