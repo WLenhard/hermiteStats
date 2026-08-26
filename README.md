@@ -84,8 +84,7 @@ stability of a robust method.
   estimator as a default choice.
 - **Shape Attenuation Diagnostic (A):** Quantifies how much of the
   observed association is suppressed purely by marginal shape mismatch
-  (Hoeffding-Fréchet bounds) — a diagnostic with no counterpart in
-  classical correlation analysis.
+  (Hoeffding-Fréchet bounds).
 - **Flexible Monotonicity Enforcement:** Supports both a relaxed,
   rank-concordance-based check and a strict, analytically verified
   monotonicity constraint (root-finding on the fitted derivative).
@@ -228,9 +227,8 @@ directly from GitHub:
 remotes::install_github(\"WLenhard/hermiteStats\")
 ```
 
-The package depends only on base R (`graphics`, `grDevices`, `stats`)
-and requires R \>= 3.5.0 — there are no heavyweight dependencies to
-resolve.
+The package depends only on base R and requires R \>= 3.5.0 — there are
+no dependencies to resolve.
 
 ## Quick Start and Examples
 
@@ -243,10 +241,9 @@ library(hermiteStats)
 At the core of the package is `hermite_fit()`, which maps a numeric
 vector onto standard normal scores, fits a regularized monotone
 polynomial quantile function, and extracts the population mean,
-variance, skewness, and excess kurtosis in exact closed algebraic form —
-without needing a separate package for higher-order moments, and without
-the instability of raw sample skewness/kurtosis estimators in small or
-heavy-tailed samples.
+variance, skewness, and excess kurtosis in exact closed algebraic form,
+without the instability of raw sample variance, skewness and kurtosis
+estimators in small or heavy-tailed samples.
 
 ``` r
 set.seed(42)
@@ -401,6 +398,20 @@ print(R_hermite)
 #> Sepal.Width         0.987       1.000        0.960       0.944
 #> Petal.Length        0.971       0.960        1.000       0.976
 #> Petal.Width         0.958       0.944        0.976       1.000
+#> 
+#>   Hermite-Mehler Covariance Matrix (cov_HM; Diagonale: Variances):
+#>              Sepal.Length Sepal.Width Petal.Length Petal.Width
+#> Sepal.Length        0.683      -0.033        1.181       0.460
+#> Sepal.Width        -0.033       0.193       -0.192      -0.074
+#> Petal.Length        1.181      -0.192        2.883       1.071
+#> Petal.Width         0.460      -0.074        1.071       0.559
+#> 
+#>   Regularized Marginal Moments:
+#>      Variable  Mean Variance    SD Skewness Degree
+#>  Sepal.Length 5.844    0.683 0.826    0.318      3
+#>   Sepal.Width 3.058    0.193 0.439    0.335      3
+#>  Petal.Length 3.757    2.883 1.698   -0.069      3
+#>   Petal.Width 1.201    0.559 0.748    0.008      3
 ```
 
 ### Distribution-Free Effect Sizes (d_reg)

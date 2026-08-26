@@ -29,35 +29,16 @@
 #'   \describe{
 #'     \item{\code{"fisher"}}{(Default) Analytical Fisher \eqn{z}-transformation,
 #'       treating \eqn{r_{\mathrm{HM}}} like a Pearson correlation with standard
-#'       error \eqn{1/\sqrt{n-3}}. Fast, but approximate since it borrows the
-#'       sampling-variance behavior of the classical Pearson \eqn{r}.}
+#'       error \eqn{1/\sqrt{n-3}}.}
 #'     \item{\code{"bootstrap"}}{Non-parametric percentile bootstrap that
 #'       reruns the entire Hermite-Mehler pipeline (NQT, polynomial refit,
-#'       Mehler covariance) on each resample. Slower but makes no assumption
-#'       about the sampling distribution of \eqn{r_{\mathrm{HM}}}.}
+#'       Mehler covariance) on each resample.}
 #'   }
 #' @param B Integer; number of bootstrap resamples when \code{ci_method = "bootstrap"}
 #'   (default \code{1000L}).
 #' @param ... Additional arguments passed to methods.
 #'
 #' @details
-#' \subsection{Why not just use a robust rank correlation?}{
-#' Classical Pearson's \eqn{r} is highly sensitive to skewness, heavy tails, and
-#' outliers because it is driven by squared deviations on the raw scale. The
-#' usual robust alternatives regain stability by changing what is actually being
-#' estimated:
-#' \itemize{
-#'   \item \strong{Spearman's \eqn{\rho} / Kendall's \eqn{\tau}} quantify rank
-#'         concordance, not linear covariation; under bivariate normality
-#'         \eqn{E[\rho_s] = \frac{6}{\pi}\arcsin(\rho/2) \ne \rho}.
-#'   \item \strong{Trimming / Winsorizing} remove or shrink exactly the tail
-#'         observations that carry authentic covariance information.
-#'   \item \strong{Gaussian rank correlation} reports the copula correlation
-#'         \eqn{\rho_z} of the normalized scores, not the manifest Pearson \eqn{r}
-#'         of the original variables.
-#' }
-#' }
-#'
 #' \subsection{The Hermite-Mehler pipeline}{
 #' \enumerate{
 #'   \item Both variables are mapped to standard normal scores \eqn{Z_x, Z_y}
@@ -84,24 +65,17 @@
 #' When the two marginal shapes differ substantially (e.g. a roughly symmetric
 #' variable paired with a strongly skewed one), the Hoeffding-Frechet bounds
 #' imply that the achievable Pearson correlation is strictly below 1 in
-#' absolute value, even for a perfect (\eqn{\rho_z = \pm 1}) latent association.
-#' The ratio
+#' absolute value. The ratio
 #' \deqn{A = \frac{r_{\mathrm{HM}}}{\rho_z}}
-#' quantifies this ceiling: \eqn{A \approx 1} indicates that marginal shape does
-#' not materially restrict the manifest association; \eqn{A \ll 1} indicates
-#' that a raw Pearson correlation would understate the underlying association
-#' largely because of scale/shape mismatch, not weak dependence.
+#' quantifies this ceiling.
 #' }
 #'
 #' \subsection{Matrices and missing data}{
 #' For matrix or data-frame input, each column's marginal quantile model is
-#' fitted once and reused for every pair it appears in, provided the input
-#' contains no missing or non-finite values. If missing values are present and
-#' differ in pattern across columns, \code{cor_hermite} instead falls back to
-#' exact pairwise-complete-case fitting for every pair (analogous to
-#' \code{stats::cor(..., use = "pairwise.complete.obs")}), since a single
-#' cached marginal fit per column would otherwise be evaluated over an
-#' inconsistent set of cases across pairs.
+#' fitted once and cached for every pair it appears in, provided the input
+#' contains no missing values. If missing values are present, \code{cor_hermite}
+#' falls back to pairwise-complete-case fitting for every pair (matching
+#' \code{stats::cor(..., use = "pairwise.complete.obs")}).
 #' }
 #'
 #' @return
@@ -121,17 +95,20 @@
 #'   \item{\code{ci}, \code{conf_level}, \code{ci_method}}{Confidence interval results, if requested.}
 #' }
 #'
-#' For a matrix or data frame, an S3 object of class \code{"cor_hermite_matrix"} containing
-#' matrices \code{r_hm}, \code{rho_z}, \code{attenuation}, and the sample size \code{n}.
+#' For a matrix or data frame, an S3 object of class \code{"cor_hermite_matrix"} containing:
+#' \describe{
+#'   \item{\code{r_hm}}{The \eqn{p \times p} regularized Hermite-Mehler correlation matrix.}
+#'   \item{\code{rho_z}}{The \eqn{p \times p} latent Gaussian copula correlation matrix.}
+#'   \item{\code{attenuation}}{The \eqn{p \times p} shape-attenuation factor matrix.}
+#'   \item{\code{cov}}{The \eqn{p \times p} regularized covariance matrix (with variances on the diagonal).}
+#'   \item{\code{marginals}}{A data frame containing regularized univariate summary statistics (Mean, Variance, SD, Degree) for each column.}
+#'   \item{\code{n}}{Sample size.}
+#' }
 #'
 #' @references
 #' Carroll, J. B. (1961). The nature of the data, or how to choose a correlation coefficient. \emph{Psychometrika}, 26(4), 347-372. \doi{10.1007/BF02289768}
 #'
-#' Fréchet, M. (1951). Sur les tableaux de corrélation dont les marges sont données. \emph{Annales de l'Université de Lyon}, 14, 53-77.
-#'
 #' Hermite, C. (1864). Sur un nouveau développement en série des fonctions. \emph{Comptes Rendus de l'Académie des Sciences, Paris}, 58, 93-100.
-#'
-#' Hoeffding, W. (1940). Massstabinvariante Korrelationstheorie. \emph{Schriften des Mathematischen Instituts und des Instituts für Angewandte Mathematik der Universität Berlin}, 5, 181-233.
 #'
 #' Lenhard, W., & Lenhard, A. (in preparation). The Hermite-Mehler Correlation: A Distribution-Robust Estimator of the Pearson Correlation Coefficient.
 #'
@@ -140,31 +117,17 @@
 #' @seealso \code{\link{d_reg}}, \code{\link{hermite_fit}}, \code{\link{check_monotonicity}}
 #'
 #' @examples
-#' # ---------------------------------------------------------
-#' # 1. Bivariate correlation with marginal shape mismatch
-#' # ---------------------------------------------------------
+#' # 1. Bivariate correlation
 #' set.seed(123)
-#' n <- 50
-#' z <- rnorm(n)
-#' x <- rnorm(n, mean = 100, sd = 15)            # symmetric
-#' y <- exp(0.5 * z + rnorm(n, sd = 0.5))         # skewed lognormal
-#'
-#' r_fit <- cor_hermite(x, y, conf_level = 0.95, ci_method = "fisher")
+#' x <- rnorm(50, mean = 100, sd = 15)
+#' y <- exp(0.5 * scale(x) + rnorm(50, sd = 0.5))
+#' r_fit <- cor_hermite(x, y, conf_level = 0.95)
 #' print(r_fit)
-#' summary(r_fit)
 #'
-#' # ---------------------------------------------------------
-#' # 2. Correlation matrix (numeric columns only)
-#' # ---------------------------------------------------------
+#' # 2. Matrix input
 #' data(iris)
 #' r_mat <- cor_hermite(iris[, 1:4])
 #' print(r_mat)
-#'
-#' # ---------------------------------------------------------
-#' # 3. Percentile bootstrap confidence interval
-#' # ---------------------------------------------------------
-#' r_boot <- cor_hermite(x, y, conf_level = 0.95, ci_method = "bootstrap", B = 500)
-#' confint(r_boot)
 #'
 #' @author Wolfgang Lenhard, Alexandra Lenhard
 #' @export
@@ -173,27 +136,20 @@ cor_hermite <- function(x, ...) {
 }
 
 # -----------------------------------------------------------------------------
-# Internal Helper: Mehler covariance / correlation for a pair of fitted models
+# Internal Helper: Mehler bilinear covariance for two already-fitted quantile models
 # -----------------------------------------------------------------------------
 
 #' Mehler bilinear covariance for two already-fitted quantile models
-#'
-#' Given two \code{\link{hermite_fit}} objects, computes the latent copula
-#' correlation, the closed-form manifest covariance/correlation under Mehler's
-#' expansion, and the shape attenuation factor. Shared by
-#' \code{cor_hermite.default} (single pair) and the cached fast path in
-#' \code{cor_hermite.matrix} (many pairs), so the two code paths cannot
-#' numerically diverge.
-#'
-#' @param fit_x,fit_y Objects of class \code{"hermite_fit"}, fitted on
-#'   observations that correspond row-for-row (i.e. \code{fit_x$z} and
-#'   \code{fit_y$z} must be the same length and refer to the same cases).
-#' @return A list with elements \code{r_hm}, \code{rho_z}, \code{attenuation},
-#'   \code{cov_xy}, \code{var_x}, \code{var_y}, \code{mean_x}, \code{mean_y},
-#'   and \code{degrees}.
 #' @noRd
 .cor_hermite_pair <- function(fit_x, fit_y) {
   rho_z <- stats::cor(fit_x$z, fit_y$z)
+  if (!is.finite(rho_z)) return(list(
+    r_hm = NA_real_, rho_z = NA_real_, attenuation = NA_real_,
+    cov_xy = NA_real_, var_x = fit_x$variance, var_y = fit_y$variance,
+    mean_x = fit_x$mean, mean_y = fit_y$mean,
+    degrees = c(x = fit_x$degree, y = fit_y$degree)
+  ))
+
   rho_z <- max(-1.0, min(1.0, rho_z))
 
   dx <- fit_x$degree; dy <- fit_y$degree
@@ -208,10 +164,6 @@ cor_hermite <- function(x, ...) {
   fact_v <- factorial(1L:max_d)
 
   cov_xy <- sum(a[-1L] * b[-1L] * fact_v * (rho_z^(1L:max_d)))
-
-  # Marginal variances/means are identical to those already stored on the
-  # hermite_fit objects (zero-padding to max_d adds only zero-valued terms);
-  # reused directly rather than recomputed.
   var_x <- fit_x$variance
   var_y <- fit_y$variance
 
@@ -223,8 +175,10 @@ cor_hermite <- function(x, ...) {
     rho_z = rho_z,
     attenuation = attenuation,
     cov_xy = cov_xy,
-    var_x = var_x, var_y = var_y,
-    mean_x = fit_x$mean, mean_y = fit_y$mean,
+    var_x = var_x,
+    var_y = var_y,
+    mean_x = fit_x$mean,
+    mean_y = fit_y$mean,
     degrees = c(x = dx, y = dy)
   )
 }
@@ -255,7 +209,6 @@ cor_hermite.default <- function(x, y, poly_degree = 3L,
     return(structure(list(r_hm = NA_real_, rho_z = NA_real_, attenuation = NA_real_), class = "cor_hermite"))
   }
 
-  # Fit marginal polynomial quantile functions
   fit_x <- hermite_fit(x_c, degree = poly_degree, monotonicity = monotonicity, ties_method = ties_method, force_odd = TRUE)
   fit_y <- hermite_fit(y_c, degree = poly_degree, monotonicity = monotonicity, ties_method = ties_method, force_odd = TRUE)
 
@@ -287,24 +240,7 @@ cor_hermite.default <- function(x, y, poly_degree = 3L,
   res
 }
 
-# -----------------------------------------------------------------------------
-# Internal Helper: Assemble a cor_hermite object from pre-fitted quantile models
-# -----------------------------------------------------------------------------
-
 #' Assemble a cor_hermite result from two already-fitted quantile models
-#'
-#' Builds the complete \code{"cor_hermite"} S3 object from two
-#' \code{\link{hermite_fit}} objects that were already fitted elsewhere (e.g.
-#' the marginal fits computed inside \code{\link{d_reg}} for paired designs),
-#' avoiding redundant refitting of the same marginal distributions.
-#'
-#' @param fit_x,fit_y Objects of class \code{"hermite_fit"}, fitted on cases
-#'   that correspond row-for-row.
-#' @param poly_degree_requested Integer; requested polynomial degree
-#'   (recorded as metadata only).
-#' @param monotonicity,ties_method Character; the settings used to obtain
-#'   \code{fit_x}/\code{fit_y} (recorded as metadata only).
-#' @return An object of class \code{"cor_hermite"}.
 #' @noRd
 .cor_hermite_assemble <- function(fit_x, fit_y, poly_degree_requested,
                                   monotonicity, ties_method) {
@@ -344,46 +280,104 @@ cor_hermite.matrix <- function(x, poly_degree = 3L,
   cnames <- colnames(x)
   if (is.null(cnames)) cnames <- paste0("V", seq_len(p))
 
-  R_hm <- matrix(1.0, nrow = p, ncol = p, dimnames = list(cnames, cnames))
-  R_copula <- matrix(1.0, nrow = p, ncol = p, dimnames = list(cnames, cnames))
-  Att_mat <- matrix(1.0, nrow = p, ncol = p, dimnames = list(cnames, cnames))
+  # Matrices initialized with proper 1.0 diagonals for correlations and attenuation
+  R_hm     <- diag(1.0, nrow = p, ncol = p)
+  R_copula <- diag(1.0, nrow = p, ncol = p)
+  Att_mat  <- diag(1.0, nrow = p, ncol = p)
+  cov_hm   <- matrix(NA_real_, nrow = p, ncol = p)
+
+  dimnames(R_hm)     <- list(cnames, cnames)
+  dimnames(R_copula) <- list(cnames, cnames)
+  dimnames(Att_mat)  <- list(cnames, cnames)
+  dimnames(cov_hm)   <- list(cnames, cnames)
 
   fully_complete <- all(is.finite(x))
 
   if (fully_complete) {
-    # Fast path: all columns share the same set of (complete) cases, so each
-    # marginal quantile model can be fitted once and reused across all pairs,
-    # instead of p*(p-1) redundant refits.
+    # Fit each column once and cache
     fits <- vector("list", p)
+    means_v <- numeric(p)
+    vars_v  <- numeric(p)
+    sds_v   <- numeric(p)
+    skew_v   <- numeric(p)
+    degs_v  <- integer(p)
+
     for (i in seq_len(p)) {
       fits[[i]] <- hermite_fit(x[, i], degree = poly_degree, monotonicity = monotonicity,
                                ties_method = ties_method, force_odd = TRUE)
+      means_v[i] <- fits[[i]]$mean
+      vars_v[i]  <- fits[[i]]$variance
+      sds_v[i]   <- fits[[i]]$sd
+      skew_v[i]   <- fits[[i]]$skewness
+      degs_v[i]  <- fits[[i]]$degree
     }
+
+    # Diagonal of covariance matrix = variances
+    diag(cov_hm) <- vars_v
+
+    # Off-diagonals
     for (i in 1:(p - 1L)) {
       for (j in (i + 1L):p) {
         pair <- .cor_hermite_pair(fits[[i]], fits[[j]])
-        R_hm[i, j] <- R_hm[j, i] <- pair$r_hm
+        R_hm[i, j]     <- R_hm[j, i]     <- pair$r_hm
         R_copula[i, j] <- R_copula[j, i] <- pair$rho_z
-        Att_mat[i, j] <- Att_mat[j, i] <- pair$attenuation
+        Att_mat[i, j]  <- Att_mat[j, i]  <- pair$attenuation
+        cov_hm[i, j]   <- cov_hm[j, i]   <- pair$cov_xy
       }
     }
   } else {
-    # Missing data with potentially differing patterns across columns: fall
-    # back to exact pairwise-complete-case fitting for every pair (matches
-    # stats::cor(..., use = "pairwise.complete.obs") in spirit).
+    # Pairwise complete fallback
+    means_v <- numeric(p)
+    vars_v  <- numeric(p)
+    sds_v   <- numeric(p)
+    skew_v   <- numeric(p)
+    degs_v  <- integer(p)
+
+    for (i in seq_len(p)) {
+      xi <- x[is.finite(x[, i]), i]
+      fit_i <- hermite_fit(xi, degree = poly_degree, monotonicity = monotonicity,
+                           ties_method = ties_method, force_odd = TRUE)
+      means_v[i] <- fit_i$mean
+      vars_v[i]  <- fit_i$variance
+      sds_v[i]   <- fit_i$sd
+      skew_v[i]   <- fit_i$skewness
+      degs_v[i]  <- fit_i$degree
+    }
+
+    diag(cov_hm) <- vars_v
+
     for (i in 1:(p - 1L)) {
       for (j in (i + 1L):p) {
         fit <- cor_hermite.default(x[, i], x[, j], poly_degree = poly_degree,
                                    monotonicity = monotonicity, ties_method = ties_method)
-        R_hm[i, j] <- R_hm[j, i] <- fit$r_hm
+        R_hm[i, j]     <- R_hm[j, i]     <- fit$r_hm
         R_copula[i, j] <- R_copula[j, i] <- fit$rho_z
-        Att_mat[i, j] <- Att_mat[j, i] <- fit$attenuation
+        Att_mat[i, j]  <- Att_mat[j, i]  <- fit$attenuation
+        cov_hm[i, j]   <- cov_hm[j, i]   <- fit$cov_xy
       }
     }
   }
 
+  marginals_df <- data.frame(
+    Variable = cnames,
+    Mean     = means_v,
+    Variance = vars_v,
+    SD       = sds_v,
+    Skewness = skew_v,
+    Degree   = degs_v,
+    row.names = NULL,
+    stringsAsFactors = FALSE
+  )
+
   structure(
-    list(r_hm = R_hm, rho_z = R_copula, attenuation = Att_mat, n = nrow(x)),
+    list(
+      r_hm        = R_hm,
+      rho_z       = R_copula,
+      attenuation = Att_mat,
+      cov         = cov_hm,
+      marginals   = marginals_df,
+      n           = nrow(x)
+    ),
     class = "cor_hermite_matrix"
   )
 }
@@ -407,15 +401,6 @@ cor_hermite.data.frame <- function(x, poly_degree = 3L,
 # -----------------------------------------------------------------------------
 
 #' Confidence Intervals for the Hermite-Mehler Correlation
-#'
-#' @param object An object of class \code{"cor_hermite"}.
-#' @param parm Ignored (present for S3 consistency with \code{\link[stats]{confint}}).
-#' @param level Numeric scalar; confidence level (default \code{0.95}).
-#' @param method Character; \code{"fisher"} (default) or \code{"bootstrap"}.
-#' @param B Integer; number of bootstrap replications (default \code{1000L}).
-#' @param ... Additional arguments (currently unused).
-#'
-#' @return A \code{1 x 2} matrix of confidence limits.
 #' @export
 confint.cor_hermite <- function(object, parm, level = 0.95,
                                 method = c("fisher", "bootstrap"), B = 1000L, ...) {
@@ -466,8 +451,8 @@ print.cor_hermite <- function(x, digits = 3L, ...) {
 summary.cor_hermite <- function(object, digits = 3L, ...) {
   print(object, digits = digits, ...)
   cat("  Distributional Moments (Implied):\n")
-  cat(sprintf("    X: Mean = %.*f, SD = %.*f\n", digits, object$mean_x, digits, sqrt(object$var_x)))
-  cat(sprintf("    Y: Mean = %.*f, SD = %.*f\n", digits, object$mean_y, digits, sqrt(object$var_y)))
+  cat(sprintf("    X: Mean = %.*f, SD = %.*f, Var = %.*f\n", digits, object$mean_x, digits, sqrt(object$var_x), digits, object$var_x))
+  cat(sprintf("    Y: Mean = %.*f, SD = %.*f, Var = %.*f\n", digits, object$mean_y, digits, sqrt(object$var_y), digits, object$var_y))
   cat(sprintf("    Covariance(X, Y) = %.*f\n\n", digits, object$cov_xy))
   invisible(object)
 }
@@ -476,10 +461,24 @@ summary.cor_hermite <- function(object, digits = 3L, ...) {
 print.cor_hermite_matrix <- function(x, digits = 3L, ...) {
   cat("\n  Hermite-Mehler Correlation Matrix (r_HM):\n")
   print(round(x$r_hm, digits = digits))
+
   cat("\n  Latent Copula Correlation Matrix (rho_z):\n")
   print(round(x$rho_z, digits = digits))
+
   cat("\n  Shape Attenuation Factor Matrix (A = r_HM / rho_z):\n")
   print(round(x$attenuation, digits = digits))
+
+  cat("\n  Hermite-Mehler Covariance Matrix (cov_HM; Diagonale: Variances):\n")
+  print(round(x$cov, digits = digits))
+
+  cat("\n  Regularized Marginal Moments:\n")
+  marg <- x$marginals
+  marg$Mean     <- round(marg$Mean, digits = digits)
+  marg$Variance <- round(marg$Variance, digits = digits)
+  marg$SD       <- round(marg$SD, digits = digits)
+  marg$Skewness <- round(marg$Skewness, digits = digits)
+  print(marg, row.names = FALSE)
   cat("\n")
+
   invisible(x)
 }

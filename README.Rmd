@@ -57,7 +57,7 @@ Both methods address a long-standing dilemma in robust statistics: classical rem
 * **No Estimand Shift:** Retains the raw-scale Pearson correlation and standardized mean difference as the target parameters — unlike rank correlations or Winsorized effect sizes, which silently estimate a different population quantity.
 * **Variance Reduction in Small Samples (n < 50):** Regularized, low-degree polynomial quantile smoothing prevents extreme tail observations from destabilizing sample covariances and pooled standard deviations.
 * **Negligible Efficiency Loss under Normality:** Closely tracks the classical Pearson's *r* / Cohen's *d* when parametric assumptions hold, so there is essentially nothing to lose by using the regularized estimator as a default choice.
-* **Shape Attenuation Diagnostic (A):** Quantifies how much of the observed association is suppressed purely by marginal shape mismatch (Hoeffding-Fréchet bounds) — a diagnostic with no counterpart in classical correlation analysis.
+* **Shape Attenuation Diagnostic (A):** Quantifies how much of the observed association is suppressed purely by marginal shape mismatch (Hoeffding-Fréchet bounds).
 * **Flexible Monotonicity Enforcement:** Supports both a relaxed, rank-concordance-based check and a strict, analytically verified monotonicity constraint (root-finding on the fitted derivative).
 * **Fully Closed-Form Computation:** All moments and covariances are obtained algebraically via Hermite/Mehler identities — no numerical integration, simulation, or iterative optimization is required.
 
@@ -142,7 +142,7 @@ $$\hat{\sigma}_D = \sqrt{\hat{\sigma}_1^2 + \hat{\sigma}_2^2 - 2\, r_{\text{HM}}
 remotes::install_github(\"WLenhard/hermiteStats\")
 ```
 
-The package depends only on base R (`graphics`, `grDevices`, `stats`) and requires R >= 3.5.0 — there are no heavyweight dependencies to resolve.
+The package depends only on base R and requires R >= 3.5.0 — there are no dependencies to resolve.
 
 
 ## Quick Start and Examples
@@ -153,7 +153,7 @@ library(hermiteStats)
 
 ### Estimating Distributional Moments
 
-At the core of the package is `hermite_fit()`, which maps a numeric vector onto standard normal scores, fits a regularized monotone polynomial quantile function, and extracts the population mean, variance, skewness, and excess kurtosis in exact closed algebraic form — without needing a separate package for higher-order moments, and without the instability of raw sample skewness/kurtosis estimators in small or heavy-tailed samples.
+At the core of the package is `hermite_fit()`, which maps a numeric vector onto standard normal scores, fits a regularized monotone polynomial quantile function, and extracts the population mean, variance, skewness, and excess kurtosis in exact closed algebraic form, without the instability of raw sample variance, skewness and kurtosis estimators in small or heavy-tailed samples.
 
 ```{r, eval = TRUE}
 set.seed(42)
