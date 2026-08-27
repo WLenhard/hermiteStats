@@ -4,11 +4,9 @@
 #' Base-graphics plotting methods for the three primary model objects in
 #' \code{hermiteStats}: \code{\link{hermite_fit}}, \code{\link{cor_hermite}},
 #' and \code{\link{d_reg}}. Every plot is designed to make the regularization
-#' step transparent by showing the raw empirical data alongside the fitted or
-#' implied regularized quantities, so the plausibility of the underlying
-#' polynomial quantile model can be assessed visually rather than taken on
-#' faith. No plotting packages beyond base \pkg{graphics}/\pkg{grDevices} are
-#' required.
+#' step transparent by displaying the raw empirical data alongside the fitted or
+#' implied regularized curves, allowing the plausibility of the underlying
+#' polynomial quantile models to be assessed visually.
 #'
 #' @name hermiteStats_plots
 #' @keywords internal
@@ -45,6 +43,53 @@ NULL
   list(z = z_grid, x = as.vector(Zmat %*% fit$beta))
 }
 
+#' Evaluate Probabilists' Hermite Polynomials on a Grid
+#'
+#' Evaluates \eqn{He_0(z), He_1(z), \dots, He_{\text{degree}}(z)} at each
+#' element of \code{z} via the three-term recurrence
+#' \eqn{He_n(z) = z\,He_{n-1}(z) - (n-1)\,He_{n-2}(z)}.
+#'
+#' @param z Numeric vector of evaluation points.
+#' @param degree Integer; highest Hermite polynomial order required.
+#' @return A numeric matrix with \code{length(z)} rows and \code{degree + 1}
+#'   columns; column \code{m + 1} holds \eqn{He_m(z)}.
+#' @noRd
+.hermite_polynomial_matrix <- function(z, degree) {
+  n <- length(z)
+  H <- matrix(0.0, nrow = n, ncol = degree + 1L)
+  H[, 1L] <- 1.0
+  if (degree >= 1L) H[, 2L] <- z
+  if (degree >= 2L) {
+    for (k in 2:degree) {
+      H[, k + 1L] <- z * H[, k] - (k - 1L) * H[, k - 1L]
+    }
+  }
+  H
+}
+
+#' Model-Implied Conditional Mean Curve Under the Fitted Gaussian Copula
+#'
+#' Computes the exact, closed-form conditional mean \eqn{\mathbb{E}[Y \mid X = x]}
+#' implied by the fitted marginal quantile functions and latent copula correlation
+#' \eqn{\rho_z} via the Hermite reproducing property of the Mehler kernel:
+#' \deqn{\mathbb{E}\left[He_m(Z_y) \mid Z_x = z_x\right] = \rho_z^m\, He_m(z_x)}
+#'
+#' @param fit_x,fit_y Objects of class \code{"hermite_fit"}.
+#' @param rho_z Numeric; the latent Gaussian copula correlation.
+#' @param n_grid Integer; number of evaluation points along the latent range of \code{fit_x$z}.
+#' @return A list with components \code{x} and \code{y}.
+#' @noRd
+.mehler_conditional_mean <- function(fit_x, fit_y, rho_z, n_grid = 200L) {
+  z_grid <- seq(min(fit_x$z), max(fit_x$z), length.out = n_grid)
+  x_vals <- .hermite_fit_predict(fit_x, z_grid)$x
+
+  dy   <- fit_y$degree
+  He_y <- .hermite_polynomial_matrix(z_grid, dy)
+  y_vals <- as.vector(He_y %*% (fit_y$hermite_coeffs * (rho_z^(0:dy))))
+
+  list(x = x_vals, y = y_vals)
+}
+
 # -----------------------------------------------------------------------------
 # plot.hermite_fit
 # -----------------------------------------------------------------------------
@@ -56,10 +101,8 @@ NULL
 #' function \eqn{X = f(Z)}, and annotates the regularized moments.
 #'
 #' @param x An object of class \code{"hermite_fit"}.
-#' @param main Character; plot title (the realized polynomial degree is
-#'   appended automatically).
-#' @param ... Additional graphical parameters passed to the underlying
-#'   \code{\link[graphics]{plot}} call.
+#' @param main Character; plot title (realized degree is appended automatically).
+#' @param ... Additional graphical parameters passed to \code{\link[graphics]{plot}}.
 #'
 #' @return The object \code{x}, invisibly.
 #'
@@ -95,33 +138,35 @@ plot.hermite_fit <- function(x, main = "Regularized Quantile Map", ...) {
 # plot.cor_hermite
 # -----------------------------------------------------------------------------
 
-#' Plot a Hermite-Mehler Correlation Fit
+#' Plot a Hermite Correlation Fit
 #'
-#' Displays two panels: the latent Gaussian copula (standard normal scores of
-#' both variables, with the fitted latent correlation \eqn{\rho_z}), and the
-#' manifest, raw-scale scatterplot annotated with \eqn{r_{\mathrm{HM}}} and the
-#' shape attenuation factor \eqn{A}. The manifest panel overlays two reference
-#' curves: the model-implied conditional mean under the fitted Gaussian
-#' copula (exact, closed form via Mehler's identity) and a purely empirical
-#' (assumption-free) lowess smooth. Close agreement between the two supports
-#' the constant-correlation copula assumption underlying \eqn{r_{\mathrm{HM}}};
-#' systematic divergence indicates that the association between \eqn{X} and
-#' \eqn{Y} is not adequately summarized by a single latent correlation (e.g.
-#' genuine local/tail-dependent variation in the relationship).
+#' Displays two diagnostic panels:
+#' \enumerate{
+#'   \item \strong{Latent Normal Score Association:} Plots \eqn{Z_x} against \eqn{Z_y}.
+#'         For \code{copula = "gaussian"}, overlays the latent linear copula correlation \eqn{\rho_z};
+#'         for \code{copula = "none"}, displays the empirical rank-based dependence.
+#'   \item \strong{Manifest Association:} Displays the raw scatterplot annotated with
+#'         \eqn{r_{\mathrm{Hermite}}}. For \code{copula = "gaussian"}, overlays both the
+#'         model-implied conditional mean curve \eqn{\mathbb{E}[Y \mid X=x]} (exact via Mehler's identity)
+#'         and a non-parametric lowess smooth, displaying the shape-attenuation factor \eqn{A}.
+#'         For \code{copula = "none"}, displays the empirical lowess smooth without parametric assumptions.
+#' }
 #'
 #' @param x An object of class \code{"cor_hermite"}.
-#' @param ... Additional graphical parameters passed to the latent-copula
-#'   scatter plot.
+#' @param ... Additional graphical parameters passed to the latent scatter plot.
 #'
 #' @return The object \code{x}, invisibly.
 #'
 #' @examples
-#' set.seed(1)
-#' z <- rnorm(60)
-#' x <- rnorm(60, 100, 15)
-#' y <- exp(0.5 * z + rnorm(60, sd = 0.5))
-#' fit <- cor_hermite(x, y)
-#' plot(fit)
+#' # 1. Copula-free fit
+#' x <- rnorm(50, 100, 15)
+#' y <- exp(0.5 * scale(x) + rnorm(50, sd = 0.5))
+#' fit_free <- cor_hermite(x, y, copula = "none")
+#' plot(fit_free)
+#'
+#' # 2. Gaussian copula fit with Mehler reference curve
+#' fit_gauss <- cor_hermite(x, y, copula = "gaussian")
+#' plot(fit_gauss)
 #'
 #' @export
 plot.cor_hermite <- function(x, ...) {
@@ -130,49 +175,82 @@ plot.cor_hermite <- function(x, ...) {
          "(likely created with fewer than 4 complete observations).")
   }
 
+  copula_mode <- if (!is.null(x$copula)) x$copula else (if (!is.null(x$rho_z) && !is.na(x$rho_z)) "gaussian" else "none")
+
   oldpar <- graphics::par(no.readonly = TRUE)
   on.exit(graphics::par(oldpar))
   graphics::par(mfrow = c(1, 2), mar = c(4.2, 4.2, 3.4, 1.2), font.main = 1)
 
-  # --- Panel 1: Latent Gaussian copula ---------------------------------------
+  # --- Panel 1: Latent Normal Scores -----------------------------------------
   zx <- x$fit_x$z; zy <- x$fit_y$z
   lim_z <- range(zx, zy)
+
+  main_p1 <- if (copula_mode == "gaussian") "Latent Gaussian Copula" else "Latent Normal Scores (Copula-Free)"
 
   plot(zx, zy, pch = 19, cex = 0.75,
        col = grDevices::adjustcolor(.hermite_pal$g1, alpha.f = 0.45),
        xlim = lim_z, ylim = lim_z,
        xlab = "Normal Score Z(X)", ylab = "Normal Score Z(Y)",
-       main = "Latent Gaussian Copula", bty = "l",
+       main = main_p1, bty = "l",
        panel.first = graphics::grid(col = .hermite_pal$grid, lty = 1), ...)
   graphics::abline(a = 0, b = 1, col = .hermite_pal$ref, lty = 3)
-  graphics::abline(a = 0, b = x$rho_z, col = "darkblue", lwd = 2)
-  graphics::mtext(sprintf("rho_z = %.3f", x$rho_z),
-                  side = 3, line = 0.3, cex = 0.85, col = .hermite_pal$annot)
 
-  # --- Panel 2: Manifest (raw-scale) association ------------------------------
+  if (copula_mode == "gaussian" && is.finite(x$rho_z)) {
+    graphics::abline(a = 0, b = x$rho_z, col = "darkblue", lwd = 2)
+    graphics::mtext(sprintf("rho_z = %.3f", x$rho_z),
+                    side = 3, line = 0.3, cex = 0.85, col = .hermite_pal$annot)
+  } else {
+    emp_rz <- stats::cor(zx, zy)
+    graphics::abline(a = 0, b = emp_rz, col = "darkblue", lwd = 2, lty = 2)
+    graphics::mtext(sprintf("Empirical r_z = %.3f", emp_rz),
+                    side = 3, line = 0.3, cex = 0.85, col = .hermite_pal$annot)
+  }
+
+  # --- Panel 2: Manifest (Raw-Scale) Association ------------------------------
   plot(x$x, x$y, pch = 19, cex = 0.75,
        col = grDevices::adjustcolor(.hermite_pal$g2, alpha.f = 0.45),
        xlab = "Raw X", ylab = "Raw Y",
        main = "Manifest Association", bty = "l",
        panel.first = graphics::grid(col = .hermite_pal$grid, lty = 1))
 
-  # Model-implied conditional mean under the fitted Gaussian copula (exact)
-  mh <- .mehler_conditional_mean(x$fit_x, x$fit_y, x$rho_z)
-  ord <- order(mh$x)
-  graphics::lines(mh$x[ord], mh$y[ord], col = "darkblue", lwd = 2.5, lty = 1)
-
-  # Purely empirical, assumption-free local trend
+  # 1. Non-parametric empirical trend
   sm <- stats::lowess(x$x, x$y)
-  graphics::lines(sm, col = "gray30", lwd = 2, lty = 2)
 
-  graphics::legend("topleft",
-                   legend = c("Model-implied (Mehler)", "Empirical (lowess)"),
-                   col = c("darkblue", "gray30"), lwd = c(2.5, 2), lty = c(1, 2),
-                   bty = "n", cex = 0.8)
+  if (copula_mode == "gaussian" && is.finite(x$rho_z)) {
+    # Gaussian Copula: Model-implied conditional curve (Mehler) vs. Lowess
+    mh <- .mehler_conditional_mean(x$fit_x, x$fit_y, x$rho_z)
+    ord <- order(mh$x)
+    graphics::lines(mh$x[ord], mh$y[ord], col = "darkblue", lwd = 2.5, lty = 1)
+    graphics::lines(sm, col = "gray30", lwd = 2, lty = 2)
 
-  graphics::mtext(sprintf("r_HM = %.3f  |  A = %.2f", x$r_hm, x$attenuation),
-                  side = 3, line = 0.3, cex = 0.85, col = .hermite_pal$annot)
+    graphics::legend("topleft",
+                     legend = c("Model-implied (Mehler)", "Empirical (lowess)"),
+                     col = c("darkblue", "gray30"), lwd = c(2.5, 2), lty = c(1, 2),
+                     bty = "n", cex = 0.8)
 
+    graphics::mtext(sprintf("r_Hermite = %.3f  |  A = %.2f", x$r_Hermite, x$attenuation),
+                    side = 3, line = 0.3, cex = 0.85, col = .hermite_pal$annot)
+
+  } else {
+    # Copula-Free: Regularized Linear Regression Line vs. Lowess
+    beta_Hermite  <- x$cov_xy / x$var_x
+    alpha_Hermite <- x$mean_y - beta_Hermite * x$mean_x
+
+    # Draw regularized linear line across the observed range of X
+    x_grid <- seq(min(x$x), max(x$x), length.out = 100L)
+    y_pred <- alpha_Hermite + beta_Hermite * x_grid
+    graphics::lines(x_grid, y_pred, col = "darkblue", lwd = 2.5, lty = 1)
+    graphics::lines(sm, col = "gray30", lwd = 2, lty = 2)
+
+    graphics::legend("topleft",
+                     legend = c("Regularized Line (r_Hermite)", "Empirical (lowess)"),
+                     col = c("darkblue", "gray30"), lwd = c(2.5, 2), lty = c(1, 2),
+                     bty = "n", cex = 0.8)
+
+    trim_txt <- if (!is.null(x$trim) && x$trim > 0) sprintf(" (trim = %.2f)", x$trim) else ""
+    graphics::mtext(sprintf("r_Hermite = %.3f%s", x$r_Hermite, trim_txt),
+                    side = 3, line = 0.3, cex = 0.85, col = .hermite_pal$annot)
+  }
   invisible(x)
 }
 
@@ -182,14 +260,19 @@ plot.cor_hermite <- function(x, ...) {
 
 #' Plot a Distribution-Free Effect Size Fit
 #'
-#' Displays two panels: the empirical densities of both groups with their
-#' regularized means marked and the effect size (and confidence interval, if
-#' computed) annotated; and both groups' regularized quantile maps overlaid on
-#' a single panel, allowing direct visual comparison of the fitted marginal
-#' shapes.
+#' Displays two diagnostic panels:
+#' \enumerate{
+#'   \item \strong{Group Distributions:} Overlays the empirical kernel densities of
+#'         both groups with regularized group means marked by dashed vertical lines,
+#'         annotating the effect size estimate and confidence interval.
+#'   \item \strong{Regularized Quantile Maps:} Displays both groups' fitted monotone
+#'         polynomial quantile curves \eqn{X = f(Z)} on a shared latent normal axis,
+#'         providing a direct visual inspection of differences in location, variance,
+#'         and shape asymmetry.
+#' }
 #'
 #' @param x An object of class \code{"d_reg"}.
-#' @param ... Currently unused (present for S3 consistency).
+#' @param ... Currently unused (present for S3 method consistency).
 #'
 #' @return The object \code{x}, invisibly.
 #'
@@ -256,60 +339,4 @@ plot.d_reg <- function(x, ...) {
                    lwd = 2.5, bty = "n", cex = 0.85)
 
   invisible(x)
-}
-
-#' Evaluate Probabilists' Hermite Polynomials on a Grid
-#'
-#' Evaluates \eqn{He_0(z), He_1(z), \dots, He_{\text{degree}}(z)} at each
-#' element of \code{z} via the three-term recurrence
-#' \eqn{He_n(z) = z\,He_{n-1}(z) - (n-1)\,He_{n-2}(z)}. This is distinct from
-#' \code{.hermite_basis_matrix()} (which converts monomial coefficients into
-#' Hermite coefficients): here the polynomials themselves are evaluated
-#' numerically at specific points.
-#'
-#' @param z Numeric vector of evaluation points.
-#' @param degree Integer; highest Hermite polynomial order required.
-#' @return A numeric matrix with \code{length(z)} rows and \code{degree + 1}
-#'   columns; column \code{m + 1} holds \eqn{He_m(z)}.
-#' @noRd
-.hermite_polynomial_matrix <- function(z, degree) {
-  n <- length(z)
-  H <- matrix(0.0, nrow = n, ncol = degree + 1L)
-  H[, 1L] <- 1.0
-  if (degree >= 1L) H[, 2L] <- z
-  if (degree >= 2L) {
-    for (k in 2:degree) {
-      H[, k + 1L] <- z * H[, k] - (k - 1L) * H[, k - 1L]
-    }
-  }
-  H
-}
-
-#' Model-Implied Conditional Mean Curve Under the Fitted Gaussian Copula
-#'
-#' Computes the exact, closed-form conditional mean \eqn{E[Y \mid X = x]}
-#' implied by the fitted marginal quantile functions and the latent copula
-#' correlation \eqn{\rho_z}, using the Hermite-reproducing property of the
-#' Mehler kernel,
-#' \deqn{E[He_m(Z_y) \mid Z_x = z_x] = \rho_z^m\, He_m(z_x),}
-#' which follows directly from the same bilinear expansion used for the
-#' Mehler covariance formula in \code{\link{cor_hermite}}. No numerical
-#' integration or simulation is required.
-#'
-#' @param fit_x,fit_y Objects of class \code{"hermite_fit"}.
-#' @param rho_z Numeric; the latent Gaussian copula correlation.
-#' @param n_grid Integer; number of evaluation points along the latent range
-#'   of \code{fit_x$z}.
-#' @return A list with components \code{x} (manifest \eqn{X} values) and
-#'   \code{y} (the model-implied conditional mean of \eqn{Y} at each \eqn{x}).
-#' @noRd
-.mehler_conditional_mean <- function(fit_x, fit_y, rho_z, n_grid = 200L) {
-  z_grid <- seq(min(fit_x$z), max(fit_x$z), length.out = n_grid)
-  x_vals <- .hermite_fit_predict(fit_x, z_grid)$x
-
-  dy   <- fit_y$degree
-  He_y <- .hermite_polynomial_matrix(z_grid, dy)
-  y_vals <- as.vector(He_y %*% (fit_y$hermite_coeffs * rho_z^(0:dy)))
-
-  list(x = x_vals, y = y_vals)
 }

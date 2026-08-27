@@ -12,6 +12,7 @@ d_reg(x, ...)
   x,
   data = NULL,
   degree = 3L,
+  copula = c("none", "gaussian"),
   monotonicity = c("relaxed", "strict", "none"),
   paired = FALSE,
   type = c("regularized", "hedges", "glass", "combined"),
@@ -25,6 +26,7 @@ d_reg(x, ...)
   x,
   y = NULL,
   degree = 3L,
+  copula = c("none", "gaussian"),
   monotonicity = c("relaxed", "strict", "none"),
   paired = FALSE,
   type = c("regularized", "hedges", "glass", "combined"),
@@ -48,8 +50,11 @@ quantile functions (default \code{3}). Automatically reduced if
 monotonicity is violated or too few unique values are available; see
 \code{\link{hermite_fit}}.}
 
-\item{monotonicity}{Monotonicity constraint passed to
-\code{\link{hermite_fit}}:
+\item{copula}{Character string specifying the copula mode used for the paired
+correlation (\code{\link{cor_hermite}}) when \code{paired = TRUE}:
+\code{"none"} (default, copula-free cross-moments) or \code{"gaussian"} (Mehler identity).}
+
+\item{monotonicity}{Monotonicity constraint passed to \code{\link{hermite_fit}}:
 \describe{
   \item{\code{"relaxed"}}{(Default) Empirical rank-concordance criterion.
     Recommended for general applied use.}
@@ -107,11 +112,11 @@ An S3 object of class \code{"d_reg"} containing:
   \item{\code{d_z}}{Standardized mean change score (only if \code{paired = TRUE}).}
   \item{\code{hedges_g}}{Small-sample bias-corrected Hedges' \eqn{g} (always reported as a benchmark).}
   \item{\code{glass_delta}}{Glass's \eqn{\Delta} using only the Group 1 SD (always reported as a benchmark).}
-  \item{\code{type}, \code{paired}}{Settings used.}
+  \item{\code{type}, \code{paired}, \code{copula}}{Settings used.}
   \item{\code{n1, n2}}{Group sample sizes.}
   \item{\code{group1, group2}}{Regularized and raw moments per group (\code{mean}, \code{sd}, \code{variance}, \code{raw_mean}, \code{raw_sd}).}
   \item{\code{diff_moments}}{Moments of the difference scores (paired only).}
-  \item{\code{r_hm_paired}}{The \code{\link{cor_hermite}} object for the paired observations (paired only).}
+  \item{\code{r_Hermite_paired}}{The \code{\link{cor_hermite}} object for the paired observations (paired only).}
   \item{\code{sd_standardizer}}{The standard deviation actually used to standardize \code{estimate}.}
   \item{\code{degrees}}{Realized polynomial degrees per group.}
   \item{\code{monotonicity}}{Monotonicity constraint applied.}
@@ -160,27 +165,20 @@ When \code{paired = TRUE}, two complementary standardized metrics are reported:
         fitted directly as its own quantile model (rather than reconstructed
         from the marginal moments), so that
         \deqn{d_z = \frac{\hat\mu_D}{\hat\sigma_D}}
-        with \eqn{\hat\sigma_D} empirically consistent with, though not
-        algebraically forced to equal,
-        \eqn{\sqrt{\hat\sigma_1^2 + \hat\sigma_2^2 - 2 r_{\mathrm{HM}}\hat\sigma_1\hat\sigma_2}}.
+        with \eqn{\hat\sigma_D = \sqrt{\hat\sigma_1^2 + \hat\sigma_2^2 - 2 r_{\mathrm{Hermite}}\hat\sigma_1\hat\sigma_2}}.
 }
 }
 }
 \examples{
-# ---------------------------------------------------------
 # 1. Independent groups with non-normal, skewed data
-# ---------------------------------------------------------
 set.seed(42)
 ctrl <- rlnorm(30, meanlog = 2.0, sdlog = 0.5)
 trt  <- rlnorm(30, meanlog = 2.3, sdlog = 0.5)
-
-fit1 <- d_reg(ctrl, trt, conf_level = 0.95, ci_method = "bootstrap")
+fit1 <- d_reg(ctrl, trt, conf_level = 0.95)
 print(fit1)
 summary(fit1)
 
-# ---------------------------------------------------------
 # 2. Formula interface
-# ---------------------------------------------------------
 dat <- data.frame(
   rt = c(ctrl, trt),
   cond = factor(rep(c("Control", "Treatment"), each = 30))
@@ -188,12 +186,9 @@ dat <- data.frame(
 fit_form <- d_reg(rt ~ cond, data = dat, conf_level = 0.95)
 print(fit_form)
 
-# ---------------------------------------------------------
 # 3. Paired / repeated-measures design
-# ---------------------------------------------------------
 pre  <- rlnorm(25, meanlog = 3.0, sdlog = 0.4)
 post <- pre + rnorm(25, mean = 4.0, sd = 1.5)
-
 fit_paired <- d_reg(pre, post, paired = TRUE, conf_level = 0.95)
 print(fit_paired)
 

@@ -5,7 +5,8 @@
 \alias{cor_hermite.default}
 \alias{cor_hermite.matrix}
 \alias{cor_hermite.data.frame}
-\title{Hermite-Mehler Distribution-Robust Pearson Correlation}
+\alias{cor_hermitegauss}
+\title{Distribution-Robust Pearson Correlation based on Probabilists' Hermite Polynomials}
 \usage{
 cor_hermite(x, ...)
 
@@ -13,24 +14,40 @@ cor_hermite(x, ...)
   x,
   y,
   poly_degree = 3L,
+  copula = c("none", "gaussian"),
   monotonicity = c("relaxed", "strict", "none"),
   ties_method = c("average", "random"),
+  trim = 0,
   conf_level = NULL,
   ci_method = c("fisher", "bootstrap"),
   B = 1000L,
+  diagnostics = FALSE,
   ...
 )
 
 \method{cor_hermite}{matrix}(
   x,
   poly_degree = 3L,
+  copula = c("none", "gaussian"),
   monotonicity = c("relaxed", "strict", "none"),
   ties_method = c("average", "random"),
+  trim = 0,
   ...
 )
 
 \method{cor_hermite}{data.frame}(
   x,
+  poly_degree = 3L,
+  copula = c("none", "gaussian"),
+  monotonicity = c("relaxed", "strict", "none"),
+  ties_method = c("average", "random"),
+  trim = 0,
+  ...
+)
+
+cor_hermitegauss(
+  x,
+  y,
   poly_degree = 3L,
   monotonicity = c("relaxed", "strict", "none"),
   ties_method = c("average", "random"),
@@ -38,181 +55,152 @@ cor_hermite(x, ...)
 )
 }
 \arguments{
-\item{x}{A numeric vector, numeric matrix, or data frame.}
+\item{x}{A numeric vector, numeric \code{\link[base]{matrix}}, or \code{\link[base]{data.frame}}.}
 
 \item{...}{Additional arguments passed to methods.}
 
-\item{y}{A numeric vector, required when \code{x} is a vector; ignored
-when \code{x} is a matrix or data frame.}
+\item{y}{A numeric vector, required when \code{x} is a vector; ignored when \code{x} is a matrix or data frame.}
 
-\item{poly_degree}{Integer scalar; maximum polynomial degree used for the
-marginal quantile fits (default \code{3L}). Odd degrees (1, 3, 5) are
-recommended; see \code{\link{hermite_fit}}.}
+\item{poly_degree}{Integer scalar; maximum polynomial degree used for marginal quantile
+fits (default \code{3L}). Must be an odd integer (\code{1}, \code{3}, or \code{5});
+see \code{\link{hermite_fit}}.}
 
-\item{monotonicity}{Monotonicity constraint passed to
-\code{\link{hermite_fit}}: \code{"relaxed"} (default), \code{"strict"},
-or \code{"none"}.}
-
-\item{ties_method}{Rank tie-handling method passed to
-\code{\link{hermite_fit}}: \code{"average"} (default) or \code{"random"}.}
-
-\item{conf_level}{Numeric value in \eqn{(0, 1)}, e.g. \code{0.95}, or
-\code{NULL} (default) to skip confidence interval calculation. Only used
-for the two-vector method.}
-
-\item{ci_method}{Confidence interval method for the two-vector case:
+\item{copula}{Character string specifying the bivariate dependence structure:
 \describe{
-  \item{\code{"fisher"}}{(Default) Analytical Fisher \eqn{z}-transformation,
-    treating \eqn{r_{\mathrm{HM}}} like a Pearson correlation with standard
-    error \eqn{1/\sqrt{n-3}}. Fast, but approximate since it borrows the
-    sampling-variance behavior of the classical Pearson \eqn{r}.}
-  \item{\code{"bootstrap"}}{Non-parametric percentile bootstrap that
-    reruns the entire Hermite-Mehler pipeline (NQT, polynomial refit,
-    Mehler covariance) on each resample. Slower but makes no assumption
-    about the sampling distribution of \eqn{r_{\mathrm{HM}}}.}
+  \item{\code{"none"}}{(Default) Copula-free estimator. Evaluates the manifest covariance
+    directly from empirical cross-moments of the fitted polynomial quantile reconstructions.
+    Makes no bivariate normality or copula assumptions.}
+  \item{\code{"gaussian"}}{Parametric Gaussian-copula estimator. Evaluates covariance
+    analytically in closed form via Mehler's (1866) bilinear expansion under a latent
+    bivariate normal copula. Also yields the latent copula correlation \eqn{\rho_z} and
+    the shape-attenuation factor \eqn{A}.}
+}}
+
+\item{monotonicity}{Monotonicity constraint passed to \code{\link{hermite_fit}}:
+\code{"relaxed"} (default), \code{"strict"}, or \code{"none"}.}
+
+\item{ties_method}{Rank tie-handling method passed to \code{\link{hermite_fit}}:
+\code{"average"} (default) or \code{"random"}.}
+
+\item{trim}{Numeric in \eqn{[0, 0.5)}. Proportion of symmetric trimming applied to the
+pointwise product of centered fitted reconstructions when \code{copula = "none"}.
+Default is \code{0} (exact closed-form empirical mean).}
+
+\item{conf_level}{Numeric value in \eqn{(0, 1)}, e.g. \code{0.95}, or \code{NULL} (default)
+to skip confidence interval calculation (two-vector method only).}
+
+\item{ci_method}{Confidence interval method for two-vector input:
+\describe{
+  \item{\code{"fisher"}}{(Default) Analytical Fisher \eqn{z}-transformation with asymptotic
+    standard error \eqn{\mathrm{SE} = 1/\sqrt{n - 3}}.}
+  \item{\code{"bootstrap"}}{Non-parametric percentile bootstrap that refits the entire
+    marginal quantile and covariance pipeline on each resample.}
 }}
 
 \item{B}{Integer; number of bootstrap resamples when \code{ci_method = "bootstrap"}
 (default \code{1000L}).}
+
+\item{diagnostics}{Logical; if \code{TRUE} (and \code{copula = "none"}), attaches the
+empirical Hermite cross-moment matrix \eqn{\hat{\mathbf{M}}_{kl}} and reference latent
+correlation \eqn{\rho_z} as attributes. Default is \code{FALSE}.}
 }
 \value{
 For two vectors, an S3 object of class \code{"cor_hermite"} containing:
 \describe{
-  \item{\code{r_hm}}{The Hermite-Mehler Pearson correlation.}
-  \item{\code{rho_z}}{The latent Gaussian copula correlation.}
-  \item{\code{attenuation}}{The shape attenuation factor \eqn{A = r_{\mathrm{HM}} / \rho_z}.}
+  \item{\code{r_Hermite}}{The regularized Hermite Pearson correlation.}
+  \item{\code{copula}}{The copula specification used (\code{"none"} or \code{"gaussian"}).}
+  \item{\code{rho_z}}{The latent Gaussian copula correlation (only if \code{copula = "gaussian"}).}
+  \item{\code{attenuation}}{The shape attenuation factor \eqn{A} (only if \code{copula = "gaussian"}).}
   \item{\code{cov_xy}}{The regularized manifest covariance.}
   \item{\code{var_x, var_y}}{Regularized manifest variances of \eqn{X} and \eqn{Y}.}
   \item{\code{mean_x, mean_y}}{Regularized manifest means of \eqn{X} and \eqn{Y}.}
   \item{\code{degrees}}{Named integer vector of realized polynomial degrees.}
   \item{\code{poly_degree_requested}}{Requested maximum polynomial degree.}
-  \item{\code{monotonicity}, \code{ties_method}}{Methods applied.}
+  \item{\code{monotonicity}, \code{ties_method}, \code{trim}}{Configuration settings applied.}
   \item{\code{n}}{Number of complete paired observations.}
   \item{\code{fit_x}, \code{fit_y}}{The underlying \code{\link{hermite_fit}} objects.}
+  \item{\code{cross_moments}, \code{rho_z_reference}}{Diagnostic cross-moments (if requested).}
   \item{\code{ci}, \code{conf_level}, \code{ci_method}}{Confidence interval results, if requested.}
 }
 
-For a matrix or data frame, an S3 object of class \code{"cor_hermite_matrix"} containing
-matrices \code{r_hm}, \code{rho_z}, \code{attenuation}, and the sample size \code{n}.
+For a matrix or data frame, an S3 object of class \code{"cor_hermite_matrix"} containing:
+\describe{
+  \item{\code{r_Hermite}}{The \eqn{p \times p} regularized Hermite correlation matrix.}
+  \item{\code{copula}}{The copula specification used.}
+  \item{\code{rho_z}}{The \eqn{p \times p} latent copula matrix (only if \code{copula = "gaussian"}).}
+  \item{\code{attenuation}}{The \eqn{p \times p} shape-attenuation matrix (only if \code{copula = "gaussian"}).}
+  \item{\code{cov}}{The \eqn{p \times p} regularized covariance matrix (with variances on the diagonal).}
+  \item{\code{marginals}}{A data frame of regularized univariate summary statistics for each column.}
+  \item{\code{n}}{Sample size.}
+}
 }
 \description{
-Computes the distribution-robust Hermite-Mehler Pearson correlation (\eqn{r_{\mathrm{HM}}}),
-the latent Gaussian copula correlation (\eqn{\rho_z}), and the shape-attenuation
-factor (\eqn{A}) for a pair of variables, or for every pair of columns in a
-matrix or data frame.
+Computes the distribution-robust Hermite correlation (\eqn{r_{\mathrm{Hermite}}})
+for a pair of variables or for every pair of columns in a matrix or data frame.
+Supports both a **copula-free** empirical cross-moment formulation (\code{copula = "none"}, default)
+and a **parametric Gaussian-copula** formulation via Mehler's bilinear expansion
+(\code{copula = "gaussian"}).
 
-Unlike Spearman's \eqn{\rho}, Kendall's \eqn{\tau}, or Gaussian rank correlation,
-\eqn{r_{\mathrm{HM}}} targets the same estimand as the classical Pearson
-correlation of the raw, manifest variables. Unlike trimming or Winsorizing,
-it does not discard authentic tail variance to achieve stability.
+Unlike rank correlations (Spearman's \eqn{\rho}, Kendall's \eqn{\tau}) or Gaussian rank
+correlation, \eqn{r_{\mathrm{Hermite}}} preserves the raw manifest Pearson correlation estimand
+without altering the metric or discarding authentic tail variance.
 }
 \details{
-\subsection{Why not just use a robust rank correlation?}{
-Classical Pearson's \eqn{r} is highly sensitive to skewness, heavy tails, and
-outliers because it is driven by squared deviations on the raw scale. The
-usual robust alternatives regain stability by changing what is actually being
-estimated:
+\subsection{The Mathematical Framework}{
+Writing the fitted marginal polynomials in the orthogonal Probabilists' Hermite basis:
+\deqn{f(Z_x) - \mu_x = \sum_{k=1}^{d_x} a_k He_k(Z_x), \qquad g(Z_y) - \mu_y = \sum_{l=1}^{d_y} b_l He_l(Z_y)}
+the manifest covariance of the fitted quantile reconstructions decomposes exactly as:
+\deqn{\operatorname{Cov}(X, Y) = \sum_{k=1}^{d_x} \sum_{l=1}^{d_y} a_k b_l \, \mathbb{E}\left[He_k(Z_x) He_l(Z_y)\right]}
+
 \itemize{
-  \item \strong{Spearman's \eqn{\rho} / Kendall's \eqn{\tau}} quantify rank
-        concordance, not linear covariation; under bivariate normality
-        \eqn{E[\rho_s] = \frac{6}{\pi}\arcsin(\rho/2) \ne \rho}.
-  \item \strong{Trimming / Winsorizing} remove or shrink exactly the tail
-        observations that carry authentic covariance information.
-  \item \strong{Gaussian rank correlation} reports the copula correlation
-        \eqn{\rho_z} of the normalized scores, not the manifest Pearson \eqn{r}
-        of the original variables.
+  \item \strong{Copula-Free (\code{copula = "none"}):} Evaluates the expectation directly from
+        the sample cross-moments, which is algebraically identical to the sample covariance of the
+        monotonically smoothed reconstructions \eqn{\hat{w} = (f(Z_x) - \mu_x)(g(Z_y) - \mu_y)}.
+  \item \strong{Gaussian Copula (\code{copula = "gaussian"}):} Evaluates the expectation analytically
+        via Mehler's (1866) expansion \eqn{\mathbb{E}[He_k(Z_x)He_l(Z_y)] = \delta_{kl} k! \rho_z^k},
+        yielding \eqn{\operatorname{Cov}(X, Y) = \sum_{k=1}^{\min(d_x, d_y)} a_k b_k k! \rho_z^k}.
 }
 }
 
-\subsection{The Hermite-Mehler pipeline}{
-\enumerate{
-  \item Both variables are mapped to standard normal scores \eqn{Z_x, Z_y}
-        via rank-based inverse-normal transformation. Their sample correlation
-        is the latent Gaussian copula parameter \eqn{\rho_z}.
-  \item The inverse quantile functions \eqn{X = f(Z_x)} and \eqn{Y = g(Z_y)}
-        are each approximated by a low-degree monotone polynomial
-        (\code{\link{hermite_fit}}).
-  \item The polynomial coefficients are re-expressed in the orthogonal
-        Probabilists' Hermite basis. Assuming \eqn{(Z_x, Z_y)} is bivariate
-        normal with correlation \eqn{\rho_z}, Mehler's (1866) bilinear
-        expansion gives
-        \deqn{E\left[He_m(Z_x) He_n(Z_y)\right] = \delta_{mn}\, m!\, \rho_z^m,}
-        so all cross-order terms vanish and the manifest covariance follows
-        in exact closed form:
-        \deqn{\mathrm{Cov}(X,Y) = \sum_{m=1}^{\min(k_x,k_y)} a_m b_m\, m!\, \rho_z^m,}
-        \deqn{\mathrm{Var}(X) = \sum_{m=1}^{k_x} a_m^2\, m!, \qquad
-              \mathrm{Var}(Y) = \sum_{m=1}^{k_y} b_m^2\, m!,}
-        \deqn{r_{\mathrm{HM}} = \frac{\mathrm{Cov}(X,Y)}{\sqrt{\mathrm{Var}(X)\,\mathrm{Var}(Y)}}.}
-}
-}
-
-\subsection{Shape attenuation factor A}{
-When the two marginal shapes differ substantially (e.g. a roughly symmetric
-variable paired with a strongly skewed one), the Hoeffding-Frechet bounds
-imply that the achievable Pearson correlation is strictly below 1 in
-absolute value, even for a perfect (\eqn{\rho_z = \pm 1}) latent association.
-The ratio
-\deqn{A = \frac{r_{\mathrm{HM}}}{\rho_z}}
-quantifies this ceiling: \eqn{A \approx 1} indicates that marginal shape does
-not materially restrict the manifest association; \eqn{A \ll 1} indicates
-that a raw Pearson correlation would understate the underlying association
-largely because of scale/shape mismatch, not weak dependence.
-}
-
-\subsection{Matrices and missing data}{
-For matrix or data-frame input, each column's marginal quantile model is
-fitted once and reused for every pair it appears in, provided the input
-contains no missing or non-finite values. If missing values are present and
-differ in pattern across columns, \code{cor_hermite} instead falls back to
-exact pairwise-complete-case fitting for every pair (analogous to
-\code{stats::cor(..., use = "pairwise.complete.obs")}), since a single
-cached marginal fit per column would otherwise be evaluated over an
-inconsistent set of cases across pairs.
+\subsection{Shape Attenuation Factor (\eqn{A})}{
+When \code{copula = "gaussian"}, the framework yields the latent copula parameter \eqn{\rho_z}
+and the shape attenuation factor:
+\deqn{A = \frac{r_{\mathrm{Hermite}}}{\rho_z}}
+which quantifies how much the manifest linear correlation is constrained by marginal shape
+asymmetry (Hoeffding-Fréchet bounds). For \code{copula = "none"}, \eqn{\rho_z} and \eqn{A}
+are not defined.
 }
 }
 \examples{
-# ---------------------------------------------------------
-# 1. Bivariate correlation with marginal shape mismatch
-# ---------------------------------------------------------
+# 1. Copula-free Hermite correlation (default)
 set.seed(123)
-n <- 50
-z <- rnorm(n)
-x <- rnorm(n, mean = 100, sd = 15)            # symmetric
-y <- exp(0.5 * z + rnorm(n, sd = 0.5))         # skewed lognormal
+x <- rnorm(50, mean = 100, sd = 15)
+y <- exp(0.5 * scale(x) + rnorm(50, sd = 0.5))
+r_free <- cor_hermite(x, y, conf_level = 0.95)
+print(r_free)
 
-r_fit <- cor_hermite(x, y, conf_level = 0.95, ci_method = "fisher")
-print(r_fit)
-summary(r_fit)
+# 2. Gaussian-copula Hermite-Mehler correlation
+r_gauss <- cor_hermite(x, y, copula = "gaussian", conf_level = 0.95)
+print(r_gauss)
+summary(r_gauss)
 
-# ---------------------------------------------------------
-# 2. Correlation matrix (numeric columns only)
-# ---------------------------------------------------------
+# 3. Multivariate Correlation Matrix
 data(iris)
 r_mat <- cor_hermite(iris[, 1:4])
 print(r_mat)
 
-# ---------------------------------------------------------
-# 3. Percentile bootstrap confidence interval
-# ---------------------------------------------------------
-r_boot <- cor_hermite(x, y, conf_level = 0.95, ci_method = "bootstrap", B = 500)
-confint(r_boot)
-
 }
 \references{
-Carroll, J. B. (1961). The nature of the data, or how to choose a correlation coefficient. \emph{Psychometrika}, 26(4), 347-372. \doi{10.1007/BF02289768}
+Carroll, J. B. (1961). The nature of the data, or how to choose a correlation coefficient. \emph{Psychometrika}, 26(4), 347–372. \doi{10.1007/BF02289768}
 
-Fréchet, M. (1951). Sur les tableaux de corrélation dont les marges sont données. \emph{Annales de l'Université de Lyon}, 14, 53-77.
+Hermite, C. (1864). Sur un nouveau développement en série des fonctions. \emph{Comptes Rendus de l'Académie des Sciences, Paris}, 58, 93–100.
 
-Hermite, C. (1864). Sur un nouveau développement en série des fonctions. \emph{Comptes Rendus de l'Académie des Sciences, Paris}, 58, 93-100.
+Lenhard, W., & Lenhard, A. (2026). The Hermite-Mehler Correlation: A Distribution-Robust Estimator of the Pearson Correlation Coefficient. \emph{Behavior Research Methods}.
 
-Hoeffding, W. (1940). Massstabinvariante Korrelationstheorie. \emph{Schriften des Mathematischen Instituts und des Instituts für Angewandte Mathematik der Universität Berlin}, 5, 181-233.
-
-Lenhard, W., & Lenhard, A. (in preparation). The Hermite-Mehler Correlation: A Distribution-Robust Estimator of the Pearson Correlation Coefficient.
-
-Mehler, F. G. (1866). Ueber die Entwicklung einer Function von beliebig vielen Variabeln nach Laplaceschen Functionen höherer Ordnung. \emph{Journal für die reine und angewandte Mathematik}, 66, 161-176. \doi{10.1515/crll.1866.66.161}
+Mehler, F. G. (1866). Ueber die Entwicklung einer Function von beliebig vielen Variabeln nach Laplaceschen Functionen höherer Ordnung. \emph{Journal für die reine und angewandte Mathematik}, 66, 161–176. \doi{10.1515/crll.1866.66.161}
 }
 \seealso{
-\code{\link{d_reg}}, \code{\link{hermite_fit}}, \code{\link{check_monotonicity}}
+\code{\link{d_reg}}, \code{\link{hermite_fit}}, \code{\link{cor_hermite_boot_ci}}
 }
 \author{
 Wolfgang Lenhard, Alexandra Lenhard

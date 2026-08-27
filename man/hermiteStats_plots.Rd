@@ -7,10 +7,8 @@
 Base-graphics plotting methods for the three primary model objects in
 \code{hermiteStats}: \code{\link{hermite_fit}}, \code{\link{cor_hermite}},
 and \code{\link{d_reg}}. Every plot is designed to make the regularization
-step transparent by showing the raw empirical data alongside the fitted or
-implied regularized quantities, so the plausibility of the underlying
-polynomial quantile model can be assessed visually rather than taken on
-faith. No plotting packages beyond base \pkg{graphics}/\pkg{grDevices} are
-required.
+step transparent by displaying the raw empirical data alongside the fitted or
+implied regularized curves, allowing the plausibility of the underlying
+polynomial quantile models to be assessed visually.
 }
 \keyword{internal}

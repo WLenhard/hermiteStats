@@ -9,17 +9,22 @@
 \arguments{
 \item{x}{An object of class \code{"d_reg"}.}
 
-\item{...}{Currently unused (present for S3 consistency).}
+\item{...}{Currently unused (present for S3 method consistency).}
 }
 \value{
 The object \code{x}, invisibly.
 }
 \description{
-Displays two panels: the empirical densities of both groups with their
-regularized means marked and the effect size (and confidence interval, if
-computed) annotated; and both groups' regularized quantile maps overlaid on
-a single panel, allowing direct visual comparison of the fitted marginal
-shapes.
+Displays two diagnostic panels:
+\enumerate{
+  \item \strong{Group Distributions:} Overlays the empirical kernel densities of
+        both groups with regularized group means marked by dashed vertical lines,
+        annotating the effect size estimate and confidence interval.
+  \item \strong{Regularized Quantile Maps:} Displays both groups' fitted monotone
+        polynomial quantile curves \eqn{X = f(Z)} on a shared latent normal axis,
+        providing a direct visual inspection of differences in location, variance,
+        and shape asymmetry.
+}
 }
 \examples{
 set.seed(1)

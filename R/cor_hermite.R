@@ -1,130 +1,135 @@
-#' @title Hermite-Mehler Distribution-Robust Pearson Correlation
+#' @title Distribution-Robust Pearson Correlation based on Probabilists' Hermite Polynomials
 #'
 #' @description
-#' Computes the distribution-robust Hermite-Mehler Pearson correlation (\eqn{r_{\mathrm{HM}}}),
-#' the latent Gaussian copula correlation (\eqn{\rho_z}), and the shape-attenuation
-#' factor (\eqn{A}) for a pair of variables, or for every pair of columns in a
-#' matrix or data frame.
+#' Computes the distribution-robust Hermite correlation (\eqn{r_{\mathrm{Hermite}}})
+#' for a pair of variables or for every pair of columns in a matrix or data frame.
+#' Supports both a **copula-free** empirical cross-moment formulation (\code{copula = "none"}, default)
+#' and a **parametric Gaussian-copula** formulation via Mehler's bilinear expansion
+#' (\code{copula = "gaussian"}).
 #'
-#' Unlike Spearman's \eqn{\rho}, Kendall's \eqn{\tau}, or Gaussian rank correlation,
-#' \eqn{r_{\mathrm{HM}}} targets the same estimand as the classical Pearson
-#' correlation of the raw, manifest variables. Unlike trimming or Winsorizing,
-#' it does not discard authentic tail variance to achieve stability.
+#' Unlike rank correlations (Spearman's \eqn{\rho}, Kendall's \eqn{\tau}) or Gaussian rank
+#' correlation, \eqn{r_{\mathrm{Hermite}}} preserves the raw manifest Pearson correlation estimand
+#' without altering the metric or discarding authentic tail variance.
 #'
-#' @param x A numeric vector, numeric matrix, or data frame.
-#' @param y A numeric vector, required when \code{x} is a vector; ignored
-#'   when \code{x} is a matrix or data frame.
-#' @param poly_degree Integer scalar; maximum polynomial degree used for the
-#'   marginal quantile fits (default \code{3L}). Odd degrees (1, 3, 5) are
-#'   recommended; see \code{\link{hermite_fit}}.
-#' @param monotonicity Monotonicity constraint passed to
-#'   \code{\link{hermite_fit}}: \code{"relaxed"} (default), \code{"strict"},
-#'   or \code{"none"}.
-#' @param ties_method Rank tie-handling method passed to
-#'   \code{\link{hermite_fit}}: \code{"average"} (default) or \code{"random"}.
-#' @param conf_level Numeric value in \eqn{(0, 1)}, e.g. \code{0.95}, or
-#'   \code{NULL} (default) to skip confidence interval calculation. Only used
-#'   for the two-vector method.
-#' @param ci_method Confidence interval method for the two-vector case:
+#' @param x A numeric vector, numeric \code{\link[base]{matrix}}, or \code{\link[base]{data.frame}}.
+#' @param y A numeric vector, required when \code{x} is a vector; ignored when \code{x} is a matrix or data frame.
+#' @param poly_degree Integer scalar; maximum polynomial degree used for marginal quantile
+#'   fits (default \code{3L}). Must be an odd integer (\code{1}, \code{3}, or \code{5});
+#'   see \code{\link{hermite_fit}}.
+#' @param copula Character string specifying the bivariate dependence structure:
 #'   \describe{
-#'     \item{\code{"fisher"}}{(Default) Analytical Fisher \eqn{z}-transformation,
-#'       treating \eqn{r_{\mathrm{HM}}} like a Pearson correlation with standard
-#'       error \eqn{1/\sqrt{n-3}}.}
-#'     \item{\code{"bootstrap"}}{Non-parametric percentile bootstrap that
-#'       reruns the entire Hermite-Mehler pipeline (NQT, polynomial refit,
-#'       Mehler covariance) on each resample.}
+#'     \item{\code{"none"}}{(Default) Copula-free estimator. Evaluates the manifest covariance
+#'       directly from empirical cross-moments of the fitted polynomial quantile reconstructions.
+#'       Makes no bivariate normality or copula assumptions.}
+#'     \item{\code{"gaussian"}}{Parametric Gaussian-copula estimator. Evaluates covariance
+#'       analytically in closed form via Mehler's (1866) bilinear expansion under a latent
+#'       bivariate normal copula. Also yields the latent copula correlation \eqn{\rho_z} and
+#'       the shape-attenuation factor \eqn{A}.}
+#'   }
+#' @param monotonicity Monotonicity constraint passed to \code{\link{hermite_fit}}:
+#'   \code{"relaxed"} (default), \code{"strict"}, or \code{"none"}.
+#' @param ties_method Rank tie-handling method passed to \code{\link{hermite_fit}}:
+#'   \code{"average"} (default) or \code{"random"}.
+#' @param trim Numeric in \eqn{[0, 0.5)}. Proportion of symmetric trimming applied to the
+#'   pointwise product of centered fitted reconstructions when \code{copula = "none"}.
+#'   Default is \code{0} (exact closed-form empirical mean).
+#' @param conf_level Numeric value in \eqn{(0, 1)}, e.g. \code{0.95}, or \code{NULL} (default)
+#'   to skip confidence interval calculation (two-vector method only).
+#' @param ci_method Confidence interval method for two-vector input:
+#'   \describe{
+#'     \item{\code{"fisher"}}{(Default) Analytical Fisher \eqn{z}-transformation with asymptotic
+#'       standard error \eqn{\mathrm{SE} = 1/\sqrt{n - 3}}.}
+#'     \item{\code{"bootstrap"}}{Non-parametric percentile bootstrap that refits the entire
+#'       marginal quantile and covariance pipeline on each resample.}
 #'   }
 #' @param B Integer; number of bootstrap resamples when \code{ci_method = "bootstrap"}
 #'   (default \code{1000L}).
+#' @param diagnostics Logical; if \code{TRUE} (and \code{copula = "none"}), attaches the
+#'   empirical Hermite cross-moment matrix \eqn{\hat{\mathbf{M}}_{kl}} and reference latent
+#'   correlation \eqn{\rho_z} as attributes. Default is \code{FALSE}.
 #' @param ... Additional arguments passed to methods.
 #'
 #' @details
-#' \subsection{The Hermite-Mehler pipeline}{
-#' \enumerate{
-#'   \item Both variables are mapped to standard normal scores \eqn{Z_x, Z_y}
-#'         via rank-based inverse-normal transformation. Their sample correlation
-#'         is the latent Gaussian copula parameter \eqn{\rho_z}.
-#'   \item The inverse quantile functions \eqn{X = f(Z_x)} and \eqn{Y = g(Z_y)}
-#'         are each approximated by a low-degree monotone polynomial
-#'         (\code{\link{hermite_fit}}).
-#'   \item The polynomial coefficients are re-expressed in the orthogonal
-#'         Probabilists' Hermite basis. Assuming \eqn{(Z_x, Z_y)} is bivariate
-#'         normal with correlation \eqn{\rho_z}, Mehler's (1866) bilinear
-#'         expansion gives
-#'         \deqn{E\left[He_m(Z_x) He_n(Z_y)\right] = \delta_{mn}\, m!\, \rho_z^m,}
-#'         so all cross-order terms vanish and the manifest covariance follows
-#'         in exact closed form:
-#'         \deqn{\mathrm{Cov}(X,Y) = \sum_{m=1}^{\min(k_x,k_y)} a_m b_m\, m!\, \rho_z^m,}
-#'         \deqn{\mathrm{Var}(X) = \sum_{m=1}^{k_x} a_m^2\, m!, \qquad
-#'               \mathrm{Var}(Y) = \sum_{m=1}^{k_y} b_m^2\, m!,}
-#'         \deqn{r_{\mathrm{HM}} = \frac{\mathrm{Cov}(X,Y)}{\sqrt{\mathrm{Var}(X)\,\mathrm{Var}(Y)}}.}
+#' \subsection{The Mathematical Framework}{
+#' Writing the fitted marginal polynomials in the orthogonal Probabilists' Hermite basis:
+#' \deqn{f(Z_x) - \mu_x = \sum_{k=1}^{d_x} a_k He_k(Z_x), \qquad g(Z_y) - \mu_y = \sum_{l=1}^{d_y} b_l He_l(Z_y)}
+#' the manifest covariance of the fitted quantile reconstructions decomposes exactly as:
+#' \deqn{\operatorname{Cov}(X, Y) = \sum_{k=1}^{d_x} \sum_{l=1}^{d_y} a_k b_l \, \mathbb{E}\left[He_k(Z_x) He_l(Z_y)\right]}
+#'
+#' \itemize{
+#'   \item \strong{Copula-Free (\code{copula = "none"}):} Evaluates the expectation directly from
+#'         the sample cross-moments, which is algebraically identical to the sample covariance of the
+#'         monotonically smoothed reconstructions \eqn{\hat{w} = (f(Z_x) - \mu_x)(g(Z_y) - \mu_y)}.
+#'   \item \strong{Gaussian Copula (\code{copula = "gaussian"}):} Evaluates the expectation analytically
+#'         via Mehler's (1866) expansion \eqn{\mathbb{E}[He_k(Z_x)He_l(Z_y)] = \delta_{kl} k! \rho_z^k},
+#'         yielding \eqn{\operatorname{Cov}(X, Y) = \sum_{k=1}^{\min(d_x, d_y)} a_k b_k k! \rho_z^k}.
 #' }
 #' }
 #'
-#' \subsection{Shape attenuation factor A}{
-#' When the two marginal shapes differ substantially (e.g. a roughly symmetric
-#' variable paired with a strongly skewed one), the Hoeffding-Frechet bounds
-#' imply that the achievable Pearson correlation is strictly below 1 in
-#' absolute value. The ratio
-#' \deqn{A = \frac{r_{\mathrm{HM}}}{\rho_z}}
-#' quantifies this ceiling.
-#' }
-#'
-#' \subsection{Matrices and missing data}{
-#' For matrix or data-frame input, each column's marginal quantile model is
-#' fitted once and cached for every pair it appears in, provided the input
-#' contains no missing values. If missing values are present, \code{cor_hermite}
-#' falls back to pairwise-complete-case fitting for every pair (matching
-#' \code{stats::cor(..., use = "pairwise.complete.obs")}).
+#' \subsection{Shape Attenuation Factor (\eqn{A})}{
+#' When \code{copula = "gaussian"}, the framework yields the latent copula parameter \eqn{\rho_z}
+#' and the shape attenuation factor:
+#' \deqn{A = \frac{r_{\mathrm{Hermite}}}{\rho_z}}
+#' which quantifies how much the manifest linear correlation is constrained by marginal shape
+#' asymmetry (Hoeffding-Fréchet bounds). For \code{copula = "none"}, \eqn{\rho_z} and \eqn{A}
+#' are not defined.
 #' }
 #'
 #' @return
 #' For two vectors, an S3 object of class \code{"cor_hermite"} containing:
 #' \describe{
-#'   \item{\code{r_hm}}{The Hermite-Mehler Pearson correlation.}
-#'   \item{\code{rho_z}}{The latent Gaussian copula correlation.}
-#'   \item{\code{attenuation}}{The shape attenuation factor \eqn{A = r_{\mathrm{HM}} / \rho_z}.}
+#'   \item{\code{r_Hermite}}{The regularized Hermite Pearson correlation.}
+#'   \item{\code{copula}}{The copula specification used (\code{"none"} or \code{"gaussian"}).}
+#'   \item{\code{rho_z}}{The latent Gaussian copula correlation (only if \code{copula = "gaussian"}).}
+#'   \item{\code{attenuation}}{The shape attenuation factor \eqn{A} (only if \code{copula = "gaussian"}).}
 #'   \item{\code{cov_xy}}{The regularized manifest covariance.}
 #'   \item{\code{var_x, var_y}}{Regularized manifest variances of \eqn{X} and \eqn{Y}.}
 #'   \item{\code{mean_x, mean_y}}{Regularized manifest means of \eqn{X} and \eqn{Y}.}
 #'   \item{\code{degrees}}{Named integer vector of realized polynomial degrees.}
 #'   \item{\code{poly_degree_requested}}{Requested maximum polynomial degree.}
-#'   \item{\code{monotonicity}, \code{ties_method}}{Methods applied.}
+#'   \item{\code{monotonicity}, \code{ties_method}, \code{trim}}{Configuration settings applied.}
 #'   \item{\code{n}}{Number of complete paired observations.}
 #'   \item{\code{fit_x}, \code{fit_y}}{The underlying \code{\link{hermite_fit}} objects.}
+#'   \item{\code{cross_moments}, \code{rho_z_reference}}{Diagnostic cross-moments (if requested).}
 #'   \item{\code{ci}, \code{conf_level}, \code{ci_method}}{Confidence interval results, if requested.}
 #' }
 #'
 #' For a matrix or data frame, an S3 object of class \code{"cor_hermite_matrix"} containing:
 #' \describe{
-#'   \item{\code{r_hm}}{The \eqn{p \times p} regularized Hermite-Mehler correlation matrix.}
-#'   \item{\code{rho_z}}{The \eqn{p \times p} latent Gaussian copula correlation matrix.}
-#'   \item{\code{attenuation}}{The \eqn{p \times p} shape-attenuation factor matrix.}
+#'   \item{\code{r_Hermite}}{The \eqn{p \times p} regularized Hermite correlation matrix.}
+#'   \item{\code{copula}}{The copula specification used.}
+#'   \item{\code{rho_z}}{The \eqn{p \times p} latent copula matrix (only if \code{copula = "gaussian"}).}
+#'   \item{\code{attenuation}}{The \eqn{p \times p} shape-attenuation matrix (only if \code{copula = "gaussian"}).}
 #'   \item{\code{cov}}{The \eqn{p \times p} regularized covariance matrix (with variances on the diagonal).}
-#'   \item{\code{marginals}}{A data frame containing regularized univariate summary statistics (Mean, Variance, SD, Degree) for each column.}
+#'   \item{\code{marginals}}{A data frame of regularized univariate summary statistics for each column.}
 #'   \item{\code{n}}{Sample size.}
 #' }
 #'
 #' @references
-#' Carroll, J. B. (1961). The nature of the data, or how to choose a correlation coefficient. \emph{Psychometrika}, 26(4), 347-372. \doi{10.1007/BF02289768}
+#' Carroll, J. B. (1961). The nature of the data, or how to choose a correlation coefficient. \emph{Psychometrika}, 26(4), 347–372. \doi{10.1007/BF02289768}
 #'
-#' Hermite, C. (1864). Sur un nouveau développement en série des fonctions. \emph{Comptes Rendus de l'Académie des Sciences, Paris}, 58, 93-100.
+#' Hermite, C. (1864). Sur un nouveau développement en série des fonctions. \emph{Comptes Rendus de l'Académie des Sciences, Paris}, 58, 93–100.
 #'
-#' Lenhard, W., & Lenhard, A. (in preparation). The Hermite-Mehler Correlation: A Distribution-Robust Estimator of the Pearson Correlation Coefficient.
+#' Lenhard, W., & Lenhard, A. (2026). The Hermite-Mehler Correlation: A Distribution-Robust Estimator of the Pearson Correlation Coefficient. \emph{Behavior Research Methods}.
 #'
-#' Mehler, F. G. (1866). Ueber die Entwicklung einer Function von beliebig vielen Variabeln nach Laplaceschen Functionen höherer Ordnung. \emph{Journal für die reine und angewandte Mathematik}, 66, 161-176. \doi{10.1515/crll.1866.66.161}
+#' Mehler, F. G. (1866). Ueber die Entwicklung einer Function von beliebig vielen Variabeln nach Laplaceschen Functionen höherer Ordnung. \emph{Journal für die reine und angewandte Mathematik}, 66, 161–176. \doi{10.1515/crll.1866.66.161}
 #'
-#' @seealso \code{\link{d_reg}}, \code{\link{hermite_fit}}, \code{\link{check_monotonicity}}
+#' @seealso \code{\link{d_reg}}, \code{\link{hermite_fit}}, \code{\link{cor_hermite_boot_ci}}
 #'
 #' @examples
-#' # 1. Bivariate correlation
+#' # 1. Copula-free Hermite correlation (default)
 #' set.seed(123)
 #' x <- rnorm(50, mean = 100, sd = 15)
 #' y <- exp(0.5 * scale(x) + rnorm(50, sd = 0.5))
-#' r_fit <- cor_hermite(x, y, conf_level = 0.95)
-#' print(r_fit)
+#' r_free <- cor_hermite(x, y, conf_level = 0.95)
+#' print(r_free)
 #'
-#' # 2. Matrix input
+#' # 2. Gaussian-copula Hermite-Mehler correlation
+#' r_gauss <- cor_hermite(x, y, copula = "gaussian", conf_level = 0.95)
+#' print(r_gauss)
+#' summary(r_gauss)
+#'
+#' # 3. Multivariate Correlation Matrix
 #' data(iris)
 #' r_mat <- cor_hermite(iris[, 1:4])
 #' print(r_mat)
@@ -136,62 +141,126 @@ cor_hermite <- function(x, ...) {
 }
 
 # -----------------------------------------------------------------------------
-# Internal Helper: Mehler bilinear covariance for two already-fitted quantile models
+# Internal Helpers: Evaluated Hermite Basis & Pairwise Kernel
 # -----------------------------------------------------------------------------
 
-#' Mehler bilinear covariance for two already-fitted quantile models
+
+
+#' Pairwise Hermite Covariance & Correlation Kernel
 #' @noRd
-.cor_hermite_pair <- function(fit_x, fit_y) {
-  rho_z <- stats::cor(fit_x$z, fit_y$z)
-  if (!is.finite(rho_z)) return(list(
-    r_hm = NA_real_, rho_z = NA_real_, attenuation = NA_real_,
-    cov_xy = NA_real_, var_x = fit_x$variance, var_y = fit_y$variance,
-    mean_x = fit_x$mean, mean_y = fit_y$mean,
-    degrees = c(x = fit_x$degree, y = fit_y$degree)
-  ))
+.cor_hermite_pair <- function(fit_x, fit_y, copula = "none", trim = 0, diagnostics = FALSE) {
+  var_x  <- fit_x$variance
+  var_y  <- fit_y$variance
+  mean_x <- fit_x$mean
+  mean_y <- fit_y$mean
+  dx     <- fit_x$degree
+  dy     <- fit_y$degree
 
-  rho_z <- max(-1.0, min(1.0, rho_z))
+  if (is.na(var_x) || is.na(var_y) || var_x <= 0 || var_y <= 0) {
+    return(list(
+      r_Hermite = NA_real_, rho_z = NA_real_, attenuation = NA_real_,
+      cov_xy = NA_real_, var_x = var_x, var_y = var_y,
+      mean_x = mean_x, mean_y = mean_y,
+      degrees = c(x = dx, y = dy),
+      cross_moments = NULL, rho_z_reference = NULL
+    ))
+  }
 
-  dx <- fit_x$degree; dy <- fit_y$degree
-  max_d <- max(dx, dy)
+  denom <- sqrt(var_x * var_y)
 
-  H <- .hermite_basis_matrix(max_d)
-  bx_pad <- rep(0.0, max_d + 1L); bx_pad[1:(dx + 1L)] <- fit_x$beta
-  by_pad <- rep(0.0, max_d + 1L); by_pad[1:(dy + 1L)] <- fit_y$beta
+  if (copula == "none") {
+    # Copula-Free: Empirical products of centered fitted reconstructions
+    Zmat_x <- outer(fit_x$z, 0:dx, `^`)
+    Zmat_y <- outer(fit_y$z, 0:dy, `^`)
+    fitted_x <- as.vector(Zmat_x %*% fit_x$beta)
+    fitted_y <- as.vector(Zmat_y %*% fit_y$beta)
 
-  a <- as.vector(H %*% bx_pad)
-  b <- as.vector(H %*% by_pad)
-  fact_v <- factorial(1L:max_d)
+    w <- (fitted_x - mean_x) * (fitted_y - mean_y)
+    cov_xy <- mean(w, trim = trim)
 
-  cov_xy <- sum(a[-1L] * b[-1L] * fact_v * (rho_z^(1L:max_d)))
-  var_x <- fit_x$variance
-  var_y <- fit_y$variance
+    if (!is.finite(cov_xy)) {
+      r_Hermite <- NA_real_
+    } else {
+      cov_xy <- max(-denom, min(denom, cov_xy))
+      r_Hermite <- max(-1.0, min(1.0, cov_xy / denom))
+    }
 
-  r_hm <- if (var_x <= 0 || var_y <= 0) NA_real_ else max(-1.0, min(1.0, cov_xy / sqrt(var_x * var_y)))
-  attenuation <- if (abs(rho_z) > 1e-5) r_hm / rho_z else 1.0
+    rho_z <- NA_real_
+    attenuation <- NA_real_
+    cross_moments <- NULL
+    rho_z_ref <- NULL
+
+    if (diagnostics) {
+      n <- length(fit_x$z)
+      Hx <- .hermite_eval_basis(fit_x$z, dx)[, -1L, drop = FALSE]
+      Hy <- .hermite_eval_basis(fit_y$z, dy)[, -1L, drop = FALSE]
+      cross_moments <- crossprod(Hx, Hy) / n
+      dimnames(cross_moments) <- list(paste0("He", seq_len(dx)), paste0("He", seq_len(dy)))
+      rho_z_ref <- stats::cor(fit_x$z, fit_y$z)
+    }
+
+  } else {
+    # Gaussian Copula: Analytical Mehler bilinear expansion
+    rho_z <- stats::cor(fit_x$z, fit_y$z)
+    if (!is.finite(rho_z)) {
+      return(list(
+        r_Hermite = NA_real_, rho_z = NA_real_, attenuation = NA_real_,
+        cov_xy = NA_real_, var_x = var_x, var_y = var_y,
+        mean_x = mean_x, mean_y = mean_y,
+        degrees = c(x = dx, y = dy),
+        cross_moments = NULL, rho_z_reference = NULL
+      ))
+    }
+    rho_z <- max(-1.0, min(1.0, rho_z))
+
+    max_d <- max(dx, dy)
+    H <- .hermite_basis_matrix(max_d)
+    bx_pad <- rep(0.0, max_d + 1L); bx_pad[1:(dx + 1L)] <- fit_x$beta
+    by_pad <- rep(0.0, max_d + 1L); by_pad[1:(dy + 1L)] <- fit_y$beta
+
+    a <- as.vector(H %*% bx_pad)
+    b <- as.vector(H %*% by_pad)
+    fact_v <- factorial(1L:max_d)
+
+    cov_xy <- sum(a[-1L] * b[-1L] * fact_v * (rho_z^(1L:max_d)))
+    r_Hermite <- max(-1.0, min(1.0, cov_xy / denom))
+    attenuation <- if (abs(rho_z) > 1e-8) r_Hermite / rho_z else 1.0
+    cross_moments <- NULL
+    rho_z_ref <- rho_z
+  }
 
   list(
-    r_hm = r_hm,
-    rho_z = rho_z,
-    attenuation = attenuation,
-    cov_xy = cov_xy,
-    var_x = var_x,
-    var_y = var_y,
-    mean_x = fit_x$mean,
-    mean_y = fit_y$mean,
-    degrees = c(x = dx, y = dy)
+    r_Hermite            = r_Hermite,
+    rho_z           = rho_z,
+    attenuation     = attenuation,
+    cov_xy          = cov_xy,
+    var_x           = var_x,
+    var_y           = var_y,
+    mean_x          = mean_x,
+    mean_y          = mean_y,
+    degrees         = c(x = dx, y = dy),
+    cross_moments   = cross_moments,
+    rho_z_reference = rho_z_ref
   )
 }
+
+# -----------------------------------------------------------------------------
+# Methods: default, matrix, data.frame
+# -----------------------------------------------------------------------------
 
 #' @rdname cor_hermite
 #' @export
 cor_hermite.default <- function(x, y, poly_degree = 3L,
+                                copula = c("none", "gaussian"),
                                 monotonicity = c("relaxed", "strict", "none"),
                                 ties_method = c("average", "random"),
+                                trim = 0,
                                 conf_level = NULL,
                                 ci_method = c("fisher", "bootstrap"),
-                                B = 1000L, ...) {
+                                B = 1000L,
+                                diagnostics = FALSE, ...) {
 
+  copula       <- match.arg(copula)
   monotonicity <- match.arg(monotonicity)
   ties_method  <- match.arg(ties_method)
   ci_method    <- match.arg(ci_method)
@@ -200,76 +269,71 @@ cor_hermite.default <- function(x, y, poly_degree = 3L,
   if (!is.numeric(x) || !is.numeric(y)) stop("'x' and 'y' must be numeric vectors.")
   if (length(x) != length(y)) stop("'x' and 'y' must have identical length.")
 
+  if (length(trim) != 1L || is.na(trim) || trim < 0 || trim >= 0.5) {
+    stop("'trim' must be a single number in [0, 0.5).")
+  }
+
   ok <- is.finite(x) & is.finite(y)
   x_c <- x[ok]; y_c <- y[ok]
   n <- length(x_c)
 
-  if (n < 4L) {
-    warning("Insufficient complete observations.")
-    return(structure(list(r_hm = NA_real_, rho_z = NA_real_, attenuation = NA_real_), class = "cor_hermite"))
+  if (n < 4L || diff(range(x_c)) == 0 || diff(range(y_c)) == 0) {
+    warning("Insufficient or constant observations.")
+    return(structure(
+      list(r_Hermite = NA_real_, copula = copula, rho_z = NA_real_, attenuation = NA_real_),
+      class = "cor_hermite"
+    ))
   }
 
-  fit_x <- hermite_fit(x_c, degree = poly_degree, monotonicity = monotonicity, ties_method = ties_method, force_odd = TRUE)
-  fit_y <- hermite_fit(y_c, degree = poly_degree, monotonicity = monotonicity, ties_method = ties_method, force_odd = TRUE)
+  fit_x <- hermite_fit(x_c, degree = poly_degree, monotonicity = monotonicity,
+                       ties_method = ties_method, force_odd = TRUE)
+  fit_y <- hermite_fit(y_c, degree = poly_degree, monotonicity = monotonicity,
+                       ties_method = ties_method, force_odd = TRUE)
 
-  pair <- .cor_hermite_pair(fit_x, fit_y)
+  pair <- .cor_hermite_pair(fit_x, fit_y, copula = copula, trim = trim, diagnostics = diagnostics)
 
   res <- list(
-    r_hm = pair$r_hm,
-    rho_z = pair$rho_z,
-    attenuation = pair$attenuation,
-    cov_xy = pair$cov_xy,
-    var_x = pair$var_x, var_y = pair$var_y,
-    mean_x = pair$mean_x, mean_y = pair$mean_y,
-    degrees = pair$degrees,
+    r_Hermite                  = pair$r_Hermite,
+    copula                = copula,
+    rho_z                 = pair$rho_z,
+    attenuation           = pair$attenuation,
+    cov_xy                = pair$cov_xy,
+    var_x                 = pair$var_x,
+    var_y                 = pair$var_y,
+    mean_x                = pair$mean_x,
+    mean_y                = pair$mean_y,
+    degrees               = pair$degrees,
     poly_degree_requested = poly_degree,
-    monotonicity = monotonicity,
-    ties_method = ties_method,
-    n = n,
-    fit_x = fit_x,
-    fit_y = fit_y,
-    x = x_c, y = y_c
+    monotonicity          = monotonicity,
+    ties_method           = ties_method,
+    trim                  = trim,
+    n                     = n,
+    fit_x                 = fit_x,
+    fit_y                 = fit_y,
+    cross_moments         = pair$cross_moments,
+    rho_z_reference       = pair$rho_z_reference,
+    x                     = x_c,
+    y                     = y_c
   )
   class(res) <- "cor_hermite"
 
   if (!is.null(conf_level)) {
     res$ci <- stats::confint(res, level = conf_level, method = ci_method, B = B)
     res$conf_level <- conf_level
-    res$ci_method <- ci_method
+    res$ci_method  <- ci_method
   }
-  res
-}
-
-#' Assemble a cor_hermite result from two already-fitted quantile models
-#' @noRd
-.cor_hermite_assemble <- function(fit_x, fit_y, poly_degree_requested,
-                                  monotonicity, ties_method) {
-  pair <- .cor_hermite_pair(fit_x, fit_y)
-  res <- list(
-    r_hm = pair$r_hm,
-    rho_z = pair$rho_z,
-    attenuation = pair$attenuation,
-    cov_xy = pair$cov_xy,
-    var_x = pair$var_x, var_y = pair$var_y,
-    mean_x = pair$mean_x, mean_y = pair$mean_y,
-    degrees = pair$degrees,
-    poly_degree_requested = poly_degree_requested,
-    monotonicity = monotonicity,
-    ties_method = ties_method,
-    n = length(fit_x$x),
-    fit_x = fit_x,
-    fit_y = fit_y,
-    x = fit_x$x, y = fit_y$x
-  )
-  class(res) <- "cor_hermite"
   res
 }
 
 #' @rdname cor_hermite
 #' @export
 cor_hermite.matrix <- function(x, poly_degree = 3L,
+                               copula = c("none", "gaussian"),
                                monotonicity = c("relaxed", "strict", "none"),
-                               ties_method = c("average", "random"), ...) {
+                               ties_method = c("average", "random"),
+                               trim = 0, ...) {
+
+  copula       <- match.arg(copula)
   monotonicity <- match.arg(monotonicity)
   ties_method  <- match.arg(ties_method)
 
@@ -280,26 +344,26 @@ cor_hermite.matrix <- function(x, poly_degree = 3L,
   cnames <- colnames(x)
   if (is.null(cnames)) cnames <- paste0("V", seq_len(p))
 
-  # Matrices initialized with proper 1.0 diagonals for correlations and attenuation
-  R_hm     <- diag(1.0, nrow = p, ncol = p)
-  R_copula <- diag(1.0, nrow = p, ncol = p)
-  Att_mat  <- diag(1.0, nrow = p, ncol = p)
-  cov_hm   <- matrix(NA_real_, nrow = p, ncol = p)
+  R_Hermite     <- diag(1.0, nrow = p, ncol = p)
+  cov_Hermite   <- matrix(NA_real_, nrow = p, ncol = p)
+  dimnames(R_Hermite)   <- list(cnames, cnames)
+  dimnames(cov_Hermite) <- list(cnames, cnames)
 
-  dimnames(R_hm)     <- list(cnames, cnames)
-  dimnames(R_copula) <- list(cnames, cnames)
-  dimnames(Att_mat)  <- list(cnames, cnames)
-  dimnames(cov_hm)   <- list(cnames, cnames)
+  R_copula <- if (copula == "gaussian") diag(1.0, nrow = p, ncol = p) else NULL
+  Att_mat  <- if (copula == "gaussian") diag(1.0, nrow = p, ncol = p) else NULL
+  if (copula == "gaussian") {
+    dimnames(R_copula) <- list(cnames, cnames)
+    dimnames(Att_mat)  <- list(cnames, cnames)
+  }
 
   fully_complete <- all(is.finite(x))
 
   if (fully_complete) {
-    # Fit each column once and cache
     fits <- vector("list", p)
     means_v <- numeric(p)
     vars_v  <- numeric(p)
     sds_v   <- numeric(p)
-    skew_v   <- numeric(p)
+    skew_v  <- numeric(p)
     degs_v  <- integer(p)
 
     for (i in seq_len(p)) {
@@ -308,21 +372,21 @@ cor_hermite.matrix <- function(x, poly_degree = 3L,
       means_v[i] <- fits[[i]]$mean
       vars_v[i]  <- fits[[i]]$variance
       sds_v[i]   <- fits[[i]]$sd
-      skew_v[i]   <- fits[[i]]$skewness
+      skew_v[i]  <- fits[[i]]$skewness
       degs_v[i]  <- fits[[i]]$degree
     }
 
-    # Diagonal of covariance matrix = variances
-    diag(cov_hm) <- vars_v
+    diag(cov_Hermite) <- vars_v
 
-    # Off-diagonals
     for (i in 1:(p - 1L)) {
       for (j in (i + 1L):p) {
-        pair <- .cor_hermite_pair(fits[[i]], fits[[j]])
-        R_hm[i, j]     <- R_hm[j, i]     <- pair$r_hm
-        R_copula[i, j] <- R_copula[j, i] <- pair$rho_z
-        Att_mat[i, j]  <- Att_mat[j, i]  <- pair$attenuation
-        cov_hm[i, j]   <- cov_hm[j, i]   <- pair$cov_xy
+        pair <- .cor_hermite_pair(fits[[i]], fits[[j]], copula = copula, trim = trim)
+        R_Hermite[i, j]   <- R_Hermite[j, i]   <- pair$r_Hermite
+        cov_Hermite[i, j] <- cov_Hermite[j, i] <- pair$cov_xy
+        if (copula == "gaussian") {
+          R_copula[i, j] <- R_copula[j, i] <- pair$rho_z
+          Att_mat[i, j]  <- Att_mat[j, i]  <- pair$attenuation
+        }
       }
     }
   } else {
@@ -330,7 +394,7 @@ cor_hermite.matrix <- function(x, poly_degree = 3L,
     means_v <- numeric(p)
     vars_v  <- numeric(p)
     sds_v   <- numeric(p)
-    skew_v   <- numeric(p)
+    skew_v  <- numeric(p)
     degs_v  <- integer(p)
 
     for (i in seq_len(p)) {
@@ -340,20 +404,23 @@ cor_hermite.matrix <- function(x, poly_degree = 3L,
       means_v[i] <- fit_i$mean
       vars_v[i]  <- fit_i$variance
       sds_v[i]   <- fit_i$sd
-      skew_v[i]   <- fit_i$skewness
+      skew_v[i]  <- fit_i$skewness
       degs_v[i]  <- fit_i$degree
     }
 
-    diag(cov_hm) <- vars_v
+    diag(cov_Hermite) <- vars_v
 
     for (i in 1:(p - 1L)) {
       for (j in (i + 1L):p) {
         fit <- cor_hermite.default(x[, i], x[, j], poly_degree = poly_degree,
-                                   monotonicity = monotonicity, ties_method = ties_method)
-        R_hm[i, j]     <- R_hm[j, i]     <- fit$r_hm
-        R_copula[i, j] <- R_copula[j, i] <- fit$rho_z
-        Att_mat[i, j]  <- Att_mat[j, i]  <- fit$attenuation
-        cov_hm[i, j]   <- cov_hm[j, i]   <- fit$cov_xy
+                                   copula = copula, monotonicity = monotonicity,
+                                   ties_method = ties_method, trim = trim)
+        R_Hermite[i, j]   <- R_Hermite[j, i]   <- fit$r_Hermite
+        cov_Hermite[i, j] <- cov_Hermite[j, i] <- fit$cov_xy
+        if (copula == "gaussian") {
+          R_copula[i, j] <- R_copula[j, i] <- fit$rho_z
+          Att_mat[i, j]  <- Att_mat[j, i]  <- fit$attenuation
+        }
       }
     }
   }
@@ -371,10 +438,11 @@ cor_hermite.matrix <- function(x, poly_degree = 3L,
 
   structure(
     list(
-      r_hm        = R_hm,
+      r_Hermite        = R_Hermite,
+      copula      = copula,
       rho_z       = R_copula,
       attenuation = Att_mat,
-      cov         = cov_hm,
+      cov         = cov_Hermite,
       marginals   = marginals_df,
       n           = nrow(x)
     ),
@@ -385,27 +453,166 @@ cor_hermite.matrix <- function(x, poly_degree = 3L,
 #' @rdname cor_hermite
 #' @export
 cor_hermite.data.frame <- function(x, poly_degree = 3L,
+                                   copula = c("none", "gaussian"),
                                    monotonicity = c("relaxed", "strict", "none"),
-                                   ties_method = c("average", "random"), ...) {
+                                   ties_method = c("average", "random"),
+                                   trim = 0, ...) {
   is_num <- vapply(x, is.numeric, logical(1L))
   if (!all(is_num)) {
     stop("All columns of 'x' must be numeric. Non-numeric columns found: ",
          paste(names(x)[!is_num], collapse = ", "))
   }
-  cor_hermite.matrix(as.matrix(x), poly_degree = poly_degree,
-                     monotonicity = monotonicity, ties_method = ties_method, ...)
+  cor_hermite.matrix(as.matrix(x), poly_degree = poly_degree, copula = copula,
+                     monotonicity = monotonicity, ties_method = ties_method,
+                     trim = trim, ...)
+}
+
+#' Convenience Alias for Gaussian-Copula Hermite-Mehler Correlation
+#' @rdname cor_hermite
+#' @export
+cor_hermitegauss <- function(x, y, poly_degree = 3L,
+                             monotonicity = c("relaxed", "strict", "none"),
+                             ties_method = c("average", "random"), ...) {
+  cor_hermite(x = x, y = y, poly_degree = poly_degree, copula = "gaussian",
+              monotonicity = monotonicity, ties_method = ties_method, ...)
 }
 
 # -----------------------------------------------------------------------------
-# S3 Methods for cor_hermite: confint, print, summary
+# Inference & S3 Methods
 # -----------------------------------------------------------------------------
 
-#' Confidence Intervals for the Hermite-Mehler Correlation
+#' Percentile Bootstrap Confidence Interval for Hermite Correlation
+#'
+#' @param object A fitted \code{"cor_hermite"} object.
+#' @param x Numeric vector of original complete-case x data (optional if stored in \code{object}).
+#' @param y Numeric vector of original complete-case y data (optional if stored in \code{object}).
+#' @param B Integer; number of bootstrap replicates (default \code{1000L}).
+#' @param conf Numeric scalar; confidence level (default \code{0.95}).
+#' @param min_success Minimum proportion of successful replicates (default \code{0.90}).
+#' @param ... Additional arguments.
+#'
+#' @return An object of class \code{"cor_hermite_boot_ci"}.
+#' @export
+cor_hermite_boot_ci <- function(object, x = NULL, y = NULL,
+                                B = 1000L, conf = 0.95, min_success = 0.90, ...) {
+  if (!inherits(object, "cor_hermite")) {
+    stop("'object' must be a fitted 'cor_hermite' object.")
+  }
+
+  poly_degree  <- if (!is.null(object$poly_degree_requested)) object$poly_degree_requested else 3L
+  copula       <- if (!is.null(object$copula)) object$copula else "none"
+  monotonicity <- if (!is.null(object$monotonicity)) object$monotonicity else "relaxed"
+  ties_method  <- if (!is.null(object$ties_method)) object$ties_method else "average"
+  trim         <- if (!is.null(object$trim)) object$trim else 0
+
+  dots <- list(...)
+  if (is.null(x)) x <- if (!is.null(object$x)) object$x else dots$x
+  if (is.null(y)) y <- if (!is.null(object$y)) object$y else dots$y
+
+  if (is.null(x) || is.null(y)) {
+    stop("The original data are required for bootstrap resampling. Supply 'x' and 'y'.")
+  }
+
+  ok <- is.finite(x) & is.finite(y)
+  x <- x[ok]; y <- y[ok]
+  n <- length(x)
+
+  if (n < poly_degree + 2L || diff(range(x)) == 0 || diff(range(y)) == 0) {
+    return(structure(
+      list(estimate = object$r_Hermite, lower = NA_real_, upper = NA_real_,
+           conf = conf, B = B, n_success = 0L, n_fail = B, success_rate = 0,
+           poly_degree = poly_degree, copula = copula, ties_method = ties_method,
+           trim = trim, boot_estimates = numeric(0)),
+      class = "cor_hermite_boot_ci"
+    ))
+  }
+
+  boot_estimates <- rep(NA_real_, B)
+  for (b in seq_len(B)) {
+    idx <- sample.int(n, size = n, replace = TRUE)
+    boot_estimates[b] <- tryCatch(
+      cor_hermite(x[idx], y[idx], poly_degree = poly_degree, copula = copula,
+                  monotonicity = monotonicity, ties_method = ties_method,
+                  trim = trim)$r_Hermite,
+      error = function(e) NA_real_
+    )
+  }
+
+  success <- is.finite(boot_estimates)
+  n_success <- sum(success)
+  success_rate <- n_success / B
+
+  if (success_rate < min_success) {
+    warning(sprintf("Only %d of %d bootstrap replicates succeeded (%.1f%%).",
+                    n_success, B, 100 * success_rate), call. = FALSE)
+    return(structure(
+      list(estimate = object$r_Hermite, lower = NA_real_, upper = NA_real_,
+           conf = conf, B = B, n_success = n_success, n_fail = B - n_success,
+           success_rate = success_rate, poly_degree = poly_degree, copula = copula,
+           ties_method = ties_method, trim = trim, boot_estimates = boot_estimates[success]),
+      class = "cor_hermite_boot_ci"
+    ))
+  }
+
+  alpha <- (1 - conf) / 2
+  limits <- stats::quantile(boot_estimates[success], probs = c(alpha, 1 - alpha), names = FALSE, type = 7)
+
+  structure(
+    list(estimate = object$r_Hermite, lower = unname(limits[1L]), upper = unname(limits[2L]),
+         conf = conf, B = B, n_success = n_success, n_fail = B - n_success,
+         success_rate = success_rate, poly_degree = poly_degree, copula = copula,
+         ties_method = ties_method, trim = trim, boot_estimates = boot_estimates[success]),
+    class = "cor_hermite_boot_ci"
+  )
+}
+
+#' Confidence Intervals for Hermite Correlation Objects
+#'
+#' Computes analytical Fisher \eqn{z} or non-parametric percentile bootstrap
+#' confidence intervals for a fitted \code{"cor_hermite"} object.
+#'
+#' @param object An object of class \code{"cor_hermite"} created by \code{\link{cor_hermite}}.
+#' @param parm Ignored; included for S3 method consistency with \code{\link[stats]{confint}}.
+#' @param level Numeric scalar in \eqn{(0, 1)}; the requested confidence level (default is \code{0.95}).
+#' @param method Character string specifying the confidence interval calculation method:
+#'   \describe{
+#'     \item{\code{"fisher"}}{(Default) Fast analytical Fisher \eqn{z}-transformation with
+#'       asymptotic standard error \eqn{\mathrm{SE} = 1/\sqrt{n - 3}}.}
+#'     \item{\code{"bootstrap"}}{Non-parametric percentile bootstrap refitting the full
+#'       Hermite pipeline (NQT, polynomial quantile model, covariance estimation) across resamples.}
+#'   }
+#' @param B Integer scalar; number of bootstrap replications when \code{method = "bootstrap"}
+#'   (default is \code{1000L}).
+#' @param ... Additional arguments passed to internal methods.
+#'
+#' @details
+#' When \code{method = "fisher"}, the interval is obtained by inverting the Fisher
+#' \eqn{z}-transformation on \eqn{r_{\mathrm{HM}}}. When \code{method = "bootstrap"},
+#' the function calls \code{\link{cor_hermite_boot_ci}}, refitting the model from scratch
+#' in each bootstrap replicate while inheriting the original polynomial degree and
+#' copula settings.
+#'
+#' @return A numeric matrix of dimension \code{1 x 2} containing the lower and upper
+#'   confidence limits, with column names indicating the corresponding percentiles.
+#'
+#' @examples
+#' set.seed(42)
+#' x <- rnorm(40)
+#' y <- 0.5 * x + rnorm(40)
+#' fit <- cor_hermite(x, y)
+#'
+#' # Analytical Fisher-z 95% CI
+#' confint(fit, level = 0.95, method = "fisher")
+#'
+#' # Percentile Bootstrap 95% CI
+#' confint(fit, level = 0.95, method = "bootstrap", B = 500)
+#'
+#' @seealso \code{\link{cor_hermite}}, \code{\link{cor_hermite_boot_ci}}
 #' @export
 confint.cor_hermite <- function(object, parm, level = 0.95,
                                 method = c("fisher", "bootstrap"), B = 1000L, ...) {
   method <- match.arg(method)
-  r <- object$r_hm
+  r <- object$r_Hermite
   n <- object$n
 
   if (method == "fisher") {
@@ -414,30 +621,31 @@ confint.cor_hermite <- function(object, parm, level = 0.95,
     crit <- stats::qnorm((1 + level) / 2)
     ci <- tanh(z_r + c(-1, 1) * crit * se)
   } else {
-    boot_vals <- numeric(B)
-    x <- object$x; y <- object$y
-    for (b in seq_len(B)) {
-      idx <- sample.int(n, n, replace = TRUE)
-      fb <- cor_hermite(x[idx], y[idx], poly_degree = object$poly_degree_requested,
-                        monotonicity = object$monotonicity, ties_method = object$ties_method)
-      boot_vals[b] <- fb$r_hm
-    }
-    alpha <- (1 - level) / 2
-    ci <- stats::quantile(boot_vals, probs = c(alpha, 1 - alpha), na.rm = TRUE)
+    boot_res <- cor_hermite_boot_ci(object, B = B, conf = level)
+    ci <- c(boot_res$lower, boot_res$upper)
   }
-  matrix(ci, nrow = 1L, dimnames = list("r_HM", c(paste0(100 * (1 - level)/2, " %"),
+  matrix(ci, nrow = 1L, dimnames = list("r_Hermite", c(paste0(100 * (1 - level)/2, " %"),
                                                   paste0(100 * (1 + level)/2, " %"))))
 }
 
 #' @export
 print.cor_hermite <- function(x, digits = 3L, ...) {
-  cat("\n  Hermite-Mehler Pearson Correlation (r_HM)\n")
-  cat(strrep("-", 48), "\n", sep = "")
-  cat(sprintf("  Hermite Correlation (r_HM) :  %.*f\n", digits, x$r_hm))
-  cat(sprintf("  Latent Copula (rho_z)      :  %.*f\n", digits, x$rho_z))
-  cat(sprintf("  Shape Attenuation (A)      :  %.*f\n", digits, x$attenuation))
+  copula_label <- if (x$copula == "gaussian") "Gaussian Copula (Mehler's identity)" else "Copula-Free (empirical cross-moments)"
+
+  cat("\n  Distribution-Robust Hermite Correlation\n")
+  cat(strrep("-", 52), "\n", sep = "")
+  cat(sprintf("  Hermite Correlation (r_Hermite) :  %.*f\n", digits, x$r_Hermite))
+  cat(sprintf("  Copula Model               :  %s\n", copula_label))
   cat(sprintf("  Polynomial Degrees Fitted  :  X = %d, Y = %d\n", x$degrees["x"], x$degrees["y"]))
   cat(sprintf("  Monotonicity Check         :  %s\n", x$monotonicity))
+
+  if (x$copula == "none" && !is.null(x$trim) && x$trim > 0) {
+    cat(sprintf("  Trim Proportion            :  %.*f\n", digits, x$trim))
+  }
+  if (x$copula == "gaussian") {
+    cat(sprintf("  Latent Copula (rho_z)      :  %.*f\n", digits, x$rho_z))
+    cat(sprintf("  Shape Attenuation (A)      :  %.*f\n", digits, x$attenuation))
+  }
   if (!is.null(x$ci)) {
     cat(sprintf("  %s CI (%s): [%.*f, %.*f]\n",
                 paste0(round(x$conf_level * 100), "%"), x$ci_method,
@@ -451,24 +659,40 @@ print.cor_hermite <- function(x, digits = 3L, ...) {
 summary.cor_hermite <- function(object, digits = 3L, ...) {
   print(object, digits = digits, ...)
   cat("  Distributional Moments (Implied):\n")
-  cat(sprintf("    X: Mean = %.*f, SD = %.*f, Var = %.*f\n", digits, object$mean_x, digits, sqrt(object$var_x), digits, object$var_x))
-  cat(sprintf("    Y: Mean = %.*f, SD = %.*f, Var = %.*f\n", digits, object$mean_y, digits, sqrt(object$var_y), digits, object$var_y))
+  cat(sprintf("    X: Mean = %.*f, SD = %.*f, Var = %.*f\n",
+              digits, object$mean_x, digits, sqrt(object$var_x), digits, object$var_x))
+  cat(sprintf("    Y: Mean = %.*f, SD = %.*f, Var = %.*f\n",
+              digits, object$mean_y, digits, sqrt(object$var_y), digits, object$var_y))
   cat(sprintf("    Covariance(X, Y) = %.*f\n\n", digits, object$cov_xy))
+
+  if (!is.null(object$cross_moments)) {
+    cat("  Empirical Hermite Cross-Moments (M_hat):\n")
+    print(round(object$cross_moments, digits = digits))
+    if (!is.null(object$rho_z_reference)) {
+      cat(sprintf("  Reference Latent Correlation (rho_z): %.*f\n", digits, object$rho_z_reference))
+    }
+    cat("\n")
+  }
   invisible(object)
 }
 
 #' @export
 print.cor_hermite_matrix <- function(x, digits = 3L, ...) {
-  cat("\n  Hermite-Mehler Correlation Matrix (r_HM):\n")
-  print(round(x$r_hm, digits = digits))
+  copula_label <- if (x$copula == "gaussian") "Gaussian Copula" else "Copula-Free"
 
-  cat("\n  Latent Copula Correlation Matrix (rho_z):\n")
-  print(round(x$rho_z, digits = digits))
+  cat(sprintf("\n  Hermite Correlation Matrix (r_Hermite; %s):\n", copula_label))
+  cat(strrep("-", 52), "\n", sep = "")
+  print(round(x$r_Hermite, digits = digits))
 
-  cat("\n  Shape Attenuation Factor Matrix (A = r_HM / rho_z):\n")
-  print(round(x$attenuation, digits = digits))
+  if (x$copula == "gaussian") {
+    cat("\n  Latent Copula Correlation Matrix (rho_z):\n")
+    print(round(x$rho_z, digits = digits))
 
-  cat("\n  Hermite-Mehler Covariance Matrix (cov_HM; Diagonale: Variances):\n")
+    cat("\n  Shape Attenuation Factor Matrix (A = r_Hermite / rho_z):\n")
+    print(round(x$attenuation, digits = digits))
+  }
+
+  cat("\n  Hermite Covariance Matrix (cov_Hermite; Diagonal: Variances):\n")
   print(round(x$cov, digits = digits))
 
   cat("\n  Regularized Marginal Moments:\n")
@@ -480,5 +704,19 @@ print.cor_hermite_matrix <- function(x, digits = 3L, ...) {
   print(marg, row.names = FALSE)
   cat("\n")
 
+  invisible(x)
+}
+
+#' @export
+print.cor_hermite_boot_ci <- function(x, digits = 3L, ...) {
+  cat("\n  Bootstrap Confidence Interval for Hermite Correlation\n")
+  cat(strrep("-", 52), "\n", sep = "")
+  cat(sprintf("  Estimate (r_Hermite)           :  %.*f\n", digits, x$estimate))
+  cat(sprintf("  Copula Model              :  %s\n", x$copula))
+  cat(sprintf("  %d%% Confidence Interval  : [%.*f, %.*f]\n",
+              as.integer(x$conf * 100), digits, x$lower, digits, x$upper))
+  cat(sprintf("  Bootstrap Replicates (B)  :  %d (%d successful, %.1f%%)\n",
+              x$B, x$n_success, 100 * x$success_rate))
+  cat("\n")
   invisible(x)
 }

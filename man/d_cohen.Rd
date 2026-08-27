@@ -22,7 +22,7 @@ hedges_g(x1, x2)
   \item{\code{"avg"}}{Unweighted root-mean-square of the two group
     variances, \eqn{\sqrt{(s_1^2+s_2^2)/2}}, with degrees of freedom
     approximated via the Welch-Satterthwaite equation. Recommended when
-    group variances are expected to differ (Delacre et al., 2021).}
+    group variances are expected to differ.}
   \item{\code{"glass"}}{Glass's \eqn{\Delta}: standardizes by the Group 1
     (baseline) standard deviation only, appropriate when Group 1 alone
     represents the reference population variance (e.g. an untreated
@@ -54,8 +54,6 @@ d_cohen(g1, g2, correct_bias = FALSE) # uncorrected Cohen's d
 
 }
 \references{
-Delacre, M., Lakens, D., Ley, C., Liu, L., & Leys, C. (2021). Why Hedges' gs based on the non-pooled standard deviation should be reported with Welch's t-test. \emph{Preprint}. \doi{10.31234/osf.io/tu6mp}
-
 Hedges, L. V. (1981). Distribution theory for Glass's estimator of effect size and related estimators. \emph{Journal of Educational Statistics}, 6(2), 107-128. \doi{10.3102/10769986006002107}
 }
 \seealso{

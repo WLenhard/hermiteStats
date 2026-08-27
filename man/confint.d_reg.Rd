@@ -14,40 +14,67 @@
 )
 }
 \arguments{
-\item{object}{An object of class \code{"d_reg"}.}
+\item{object}{An object of class \code{"d_reg"} created by \code{\link{d_reg}}.}
 
-\item{parm}{Ignored (present for S3 consistency with \code{\link[stats]{confint}}).}
+\item{parm}{Ignored; included for S3 method consistency with \code{\link[stats]{confint}}.}
 
-\item{level}{Numeric scalar; confidence level (default \code{0.95}).}
+\item{level}{Numeric scalar in \eqn{(0, 1)}; the requested confidence level (default is \code{0.95}).}
 
-\item{method}{Character; \code{"bootstrap"} (default) or \code{"nct"}.}
+\item{method}{Character string specifying the confidence interval calculation method:
+\describe{
+  \item{\code{"bootstrap"}}{(Default) Non-parametric percentile bootstrap, refitting the
+    entire regularized quantile pipeline on each resample.}
+  \item{\code{"nct"}}{Analytical inversion of the noncentral \eqn{t} (lambda-prime)
+    distribution, treating the regularized point estimate as a pseudo-t pivot.}
+}}
 
-\item{B}{Integer; number of bootstrap replications (default \code{1000L}).}
+\item{B}{Integer scalar; number of bootstrap replications when \code{method = "bootstrap"}
+(default is \code{1000L}).}
 
-\item{...}{Additional arguments (currently unused).}
+\item{...}{Additional arguments passed to internal methods.}
 }
 \value{
-A \code{1 x 2} matrix of confidence limits.
+A numeric matrix of dimension \code{1 x 2} containing the lower and upper
+  confidence limits, with column names indicating the corresponding percentiles.
 }
 \description{
-Confidence Intervals for Distribution-Free Effect Sizes
+Computes non-parametric percentile bootstrap or analytical noncentral \eqn{t}
+(lambda-prime) confidence intervals for a fitted \code{"d_reg"} object.
 }
 \details{
-For \code{method = "nct"}, the analytical noncentral-t inversion
-(\code{\link{ci_nct}}) requires an effective sample size \eqn{\tilde n}
-matched to the design:
-\itemize{
-  \item \strong{Paired designs} (\code{object$paired = TRUE}): \eqn{\tilde n = n_1}
-        (the number of pairs) and \code{df = n1 - 1}, treating \eqn{d_z}
-        as a one-sample/paired-t statistic.
-  \item \strong{Glass's \eqn{\Delta}} (\code{object$type == "glass"}):
-        \eqn{\tilde n = n_1} and \code{df = n1 - 1}, consistent with
-        standardizing by the Group 1 SD alone.
-  \item \strong{All other independent-groups cases}: the classical
-        two-sample harmonic form \eqn{\tilde n = n_1 n_2/(n_1+n_2)} and
-        \code{df = n1 + n2 - 2}.
+\subsection{Bootstrap Intervals (\code{method = "bootstrap"})}{
+In each bootstrap replication, observations are resampled with replacement (preserving
+paired structure if \code{object$paired = TRUE}), and the full quantile regularization
+pipeline is refitted from scratch. The \eqn{100(1 - \alpha)\%} interval is formed from the
+empirical percentiles \eqn{\alpha/2} and \eqn{1 - \alpha/2}.
 }
-The \code{"bootstrap"} method makes no such distributional assumption and
-is recommended as the default for general use, especially for skewed or
-small-sample data.
+\subsection{Noncentral-t Inversion (\code{method = "nct"})}{
+Computes exact confidence limits by inverting the cumulative noncentral \eqn{t}
+distribution (Lecoutre, 2007) with degrees of freedom and effective sample size \eqn{\tilde{n}}
+adapted to the design:
+\itemize{
+  \item \strong{Independent groups:} \eqn{\tilde{n} = n_1 n_2 / (n_1 + n_2)} and \eqn{\mathrm{df} = n_1 + n_2 - 2}.
+  \item \strong{Paired designs / Glass's \eqn{\Delta}:} \eqn{\tilde{n} = n_1} and \eqn{\mathrm{df} = n_1 - 1}.
+}
+}
+}
+\examples{
+set.seed(42)
+ctrl <- rlnorm(25, meanlog = 2.0, sdlog = 0.5)
+trt  <- rlnorm(25, meanlog = 2.3, sdlog = 0.5)
+fit <- d_reg(ctrl, trt)
+
+# Non-parametric Percentile Bootstrap 95\% CI
+confint(fit, level = 0.95, method = "bootstrap", B = 500)
+
+# Analytical Noncentral-t 95\% CI
+confint(fit, level = 0.95, method = "nct")
+
+}
+\references{
+Lecoutre, B. (2007). Another look at the confidence intervals for the noncentral T distribution.
+\emph{Journal of Modern Applied Statistical Methods}, 6(1), 107–116. \doi{10.22237/jmasm/1177992600}
+}
+\seealso{
+\code{\link{d_reg}}
 }

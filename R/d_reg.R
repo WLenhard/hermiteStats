@@ -18,8 +18,10 @@
 #'   quantile functions (default \code{3}). Automatically reduced if
 #'   monotonicity is violated or too few unique values are available; see
 #'   \code{\link{hermite_fit}}.
-#' @param monotonicity Monotonicity constraint passed to
-#'   \code{\link{hermite_fit}}:
+#' @param copula Character string specifying the copula mode used for the paired
+#'   correlation (\code{\link{cor_hermite}}) when \code{paired = TRUE}:
+#'   \code{"none"} (default, copula-free cross-moments) or \code{"gaussian"} (Mehler identity).
+#' @param monotonicity Monotonicity constraint passed to \code{\link{hermite_fit}}:
 #'   \describe{
 #'     \item{\code{"relaxed"}}{(Default) Empirical rank-concordance criterion.
 #'       Recommended for general applied use.}
@@ -92,9 +94,7 @@
 #'         fitted directly as its own quantile model (rather than reconstructed
 #'         from the marginal moments), so that
 #'         \deqn{d_z = \frac{\hat\mu_D}{\hat\sigma_D}}
-#'         with \eqn{\hat\sigma_D} empirically consistent with, though not
-#'         algebraically forced to equal,
-#'         \eqn{\sqrt{\hat\sigma_1^2 + \hat\sigma_2^2 - 2 r_{\mathrm{HM}}\hat\sigma_1\hat\sigma_2}}.
+#'         with \eqn{\hat\sigma_D = \sqrt{\hat\sigma_1^2 + \hat\sigma_2^2 - 2 r_{\mathrm{Hermite}}\hat\sigma_1\hat\sigma_2}}.
 #' }
 #' }
 #'
@@ -108,11 +108,11 @@
 #'   \item{\code{d_z}}{Standardized mean change score (only if \code{paired = TRUE}).}
 #'   \item{\code{hedges_g}}{Small-sample bias-corrected Hedges' \eqn{g} (always reported as a benchmark).}
 #'   \item{\code{glass_delta}}{Glass's \eqn{\Delta} using only the Group 1 SD (always reported as a benchmark).}
-#'   \item{\code{type}, \code{paired}}{Settings used.}
+#'   \item{\code{type}, \code{paired}, \code{copula}}{Settings used.}
 #'   \item{\code{n1, n2}}{Group sample sizes.}
 #'   \item{\code{group1, group2}}{Regularized and raw moments per group (\code{mean}, \code{sd}, \code{variance}, \code{raw_mean}, \code{raw_sd}).}
 #'   \item{\code{diff_moments}}{Moments of the difference scores (paired only).}
-#'   \item{\code{r_hm_paired}}{The \code{\link{cor_hermite}} object for the paired observations (paired only).}
+#'   \item{\code{r_Hermite_paired}}{The \code{\link{cor_hermite}} object for the paired observations (paired only).}
 #'   \item{\code{sd_standardizer}}{The standard deviation actually used to standardize \code{estimate}.}
 #'   \item{\code{degrees}}{Realized polynomial degrees per group.}
 #'   \item{\code{monotonicity}}{Monotonicity constraint applied.}
@@ -138,20 +138,15 @@
 #' @seealso \code{\link{cor_hermite}}, \code{\link{hermite_fit}}, \code{\link{d_cohen}}, \code{\link{hedges_g}}
 #'
 #' @examples
-#' # ---------------------------------------------------------
 #' # 1. Independent groups with non-normal, skewed data
-#' # ---------------------------------------------------------
 #' set.seed(42)
 #' ctrl <- rlnorm(30, meanlog = 2.0, sdlog = 0.5)
 #' trt  <- rlnorm(30, meanlog = 2.3, sdlog = 0.5)
-#'
-#' fit1 <- d_reg(ctrl, trt, conf_level = 0.95, ci_method = "bootstrap")
+#' fit1 <- d_reg(ctrl, trt, conf_level = 0.95)
 #' print(fit1)
 #' summary(fit1)
 #'
-#' # ---------------------------------------------------------
 #' # 2. Formula interface
-#' # ---------------------------------------------------------
 #' dat <- data.frame(
 #'   rt = c(ctrl, trt),
 #'   cond = factor(rep(c("Control", "Treatment"), each = 30))
@@ -159,12 +154,9 @@
 #' fit_form <- d_reg(rt ~ cond, data = dat, conf_level = 0.95)
 #' print(fit_form)
 #'
-#' # ---------------------------------------------------------
 #' # 3. Paired / repeated-measures design
-#' # ---------------------------------------------------------
 #' pre  <- rlnorm(25, meanlog = 3.0, sdlog = 0.4)
 #' post <- pre + rnorm(25, mean = 4.0, sd = 1.5)
-#'
 #' fit_paired <- d_reg(pre, post, paired = TRUE, conf_level = 0.95)
 #' print(fit_paired)
 #'
@@ -177,6 +169,7 @@ d_reg <- function(x, ...) {
 #' @rdname d_reg
 #' @export
 d_reg.formula <- function(x, data = NULL, degree = 3L,
+                          copula = c("none", "gaussian"),
                           monotonicity = c("relaxed", "strict", "none"),
                           paired = FALSE,
                           type = c("regularized", "hedges", "glass", "combined"),
@@ -199,9 +192,9 @@ d_reg.formula <- function(x, data = NULL, degree = 3L,
   x1 <- response[group == levels_g[1L]]
   x2 <- response[group == levels_g[2L]]
 
-  res <- d_reg.default(x = x1, y = x2, degree = degree, monotonicity = monotonicity,
-                       paired = paired, type = type, conf_level = conf_level,
-                       ci_method = ci_method, B = B, ...)
+  res <- d_reg.default(x = x1, y = x2, degree = degree, copula = copula,
+                       monotonicity = monotonicity, paired = paired, type = type,
+                       conf_level = conf_level, ci_method = ci_method, B = B, ...)
   res$group_labels <- levels_g
   res
 }
@@ -209,6 +202,7 @@ d_reg.formula <- function(x, data = NULL, degree = 3L,
 #' @rdname d_reg
 #' @export
 d_reg.default <- function(x, y = NULL, degree = 3L,
+                          copula = c("none", "gaussian"),
                           monotonicity = c("relaxed", "strict", "none"),
                           paired = FALSE,
                           type = c("regularized", "hedges", "glass", "combined"),
@@ -216,6 +210,7 @@ d_reg.default <- function(x, y = NULL, degree = 3L,
                           ci_method = c("bootstrap", "nct"),
                           B = 1000L, ...) {
 
+  copula       <- match.arg(copula)
   monotonicity <- match.arg(monotonicity)
   type         <- match.arg(type)
   ci_method    <- match.arg(ci_method)
@@ -244,33 +239,30 @@ d_reg.default <- function(x, y = NULL, degree = 3L,
   # Averaged standardizer for independent groups (Cohen 1988, Delacre 2021)
   sd_avg <- sqrt((m1$variance + m2$variance) / 2.0)
 
-  # If paired, compute the difference distribution and the latent correlation.
-  # r_hm_paired reuses fit1/fit2 (already fitted above) rather than refitting
-  # both marginals a second time inside cor_hermite().
+  # If paired, compute difference distribution and Hermite correlation
   if (paired) {
     diff_scores <- x2 - x1
     fit_diff <- hermite_fit(diff_scores, degree = degree, monotonicity = monotonicity, force_odd = TRUE)
     m_diff <- hermite_moments(fit_diff)
-    r_hm_fit <- .cor_hermite_assemble(fit1, fit2, poly_degree_requested = degree,
-                                      monotonicity = monotonicity, ties_method = "average")
+    r_Hermite_fit <- .cor_hermite_assemble(fit1, fit2, poly_degree_requested = degree,
+                                      copula = copula, monotonicity = monotonicity,
+                                      ties_method = "average")
 
     # d_z: standardized mean change; d_reg_val: raw-scale repeated-measures SMD
     d_z <- m_diff$mean / m_diff$sd
     d_reg_val <- (m2$mean - m1$mean) / sd_avg
   } else {
-    fit_diff <- NULL; m_diff <- NULL; r_hm_fit <- NULL; d_z <- NULL
+    fit_diff <- NULL; m_diff <- NULL; r_Hermite_fit <- NULL; d_z <- NULL
     d_reg_val <- (m2$mean - m1$mean) / sd_avg
   }
 
-  # Classical benchmarks (always computed and reported alongside the primary estimate)
+  # Classical benchmarks
   s1 <- stats::sd(x1); s2 <- stats::sd(x2)
   sd_pooled <- sqrt(((n1 - 1L) * s1^2 + (n2 - 1L) * s2^2) / (n1 + n2 - 2L))
   j_corr <- hedges_correction(n1 + n2 - 2L)
   g_hedges <- ((mean(x2) - mean(x1)) / sd_pooled) * j_corr
   glass_delta <- (mean(x2) - mean(x1)) / s1
 
-  # "combined" always evaluates the switching rule on the independent-groups
-  # d_reg (raw scale), even for paired designs; it never falls back to d_z.
   combined_uses_hedges <- (n1 > 50L && n2 > 50L && abs(d_reg_val) > 0.8)
 
   primary_d <- switch(
@@ -290,30 +282,34 @@ d_reg.default <- function(x, y = NULL, degree = 3L,
   )
 
   res <- list(
-    estimate = primary_d,
-    d_reg = d_reg_val,
-    d_z = d_z,
-    hedges_g = g_hedges,
-    glass_delta = glass_delta,
-    type = type,
-    paired = paired,
-    n1 = n1, n2 = n2,
-    group1 = list(mean = m1$mean, sd = m1$sd, variance = m1$variance, raw_mean = mean(x1), raw_sd = s1),
-    group2 = list(mean = m2$mean, sd = m2$sd, variance = m2$variance, raw_mean = mean(x2), raw_sd = s2),
-    diff_moments = m_diff,
-    r_hm_paired = r_hm_fit,
+    estimate        = primary_d,
+    d_reg           = d_reg_val,
+    d_z             = d_z,
+    hedges_g        = g_hedges,
+    glass_delta     = glass_delta,
+    type            = type,
+    paired          = paired,
+    copula          = copula,
+    n1              = n1,
+    n2              = n2,
+    group1          = list(mean = m1$mean, sd = m1$sd, variance = m1$variance, raw_mean = mean(x1), raw_sd = s1),
+    group2          = list(mean = m2$mean, sd = m2$sd, variance = m2$variance, raw_mean = mean(x2), raw_sd = s2),
+    diff_moments    = m_diff,
+    r_Hermite_paired     = r_Hermite_fit,
     sd_standardizer = sd_standardizer,
-    degrees = c(g1 = fit1$degree, g2 = fit2$degree),
-    monotonicity = monotonicity,
-    fit1 = fit1, fit2 = fit2,
-    x1 = x1, x2 = x2
+    degrees         = c(g1 = fit1$degree, g2 = fit2$degree),
+    monotonicity    = monotonicity,
+    fit1            = fit1,
+    fit2            = fit2,
+    x1              = x1,
+    x2              = x2
   )
   class(res) <- "d_reg"
 
   if (!is.null(conf_level)) {
     res$ci <- stats::confint(res, level = conf_level, method = ci_method, B = B)
     res$conf_level <- conf_level
-    res$ci_method <- ci_method
+    res$ci_method  <- ci_method
   }
   res
 }
@@ -324,33 +320,60 @@ d_reg.default <- function(x, y = NULL, degree = 3L,
 
 #' Confidence Intervals for Distribution-Free Effect Sizes
 #'
-#' @param object An object of class \code{"d_reg"}.
-#' @param parm Ignored (present for S3 consistency with \code{\link[stats]{confint}}).
-#' @param level Numeric scalar; confidence level (default \code{0.95}).
-#' @param method Character; \code{"bootstrap"} (default) or \code{"nct"}.
-#' @param B Integer; number of bootstrap replications (default \code{1000L}).
-#' @param ... Additional arguments (currently unused).
+#' Computes non-parametric percentile bootstrap or analytical noncentral \eqn{t}
+#' (lambda-prime) confidence intervals for a fitted \code{"d_reg"} object.
+#'
+#' @param object An object of class \code{"d_reg"} created by \code{\link{d_reg}}.
+#' @param parm Ignored; included for S3 method consistency with \code{\link[stats]{confint}}.
+#' @param level Numeric scalar in \eqn{(0, 1)}; the requested confidence level (default is \code{0.95}).
+#' @param method Character string specifying the confidence interval calculation method:
+#'   \describe{
+#'     \item{\code{"bootstrap"}}{(Default) Non-parametric percentile bootstrap, refitting the
+#'       entire regularized quantile pipeline on each resample.}
+#'     \item{\code{"nct"}}{Analytical inversion of the noncentral \eqn{t} (lambda-prime)
+#'       distribution, treating the regularized point estimate as a pseudo-t pivot.}
+#'   }
+#' @param B Integer scalar; number of bootstrap replications when \code{method = "bootstrap"}
+#'   (default is \code{1000L}).
+#' @param ... Additional arguments passed to internal methods.
 #'
 #' @details
-#' For \code{method = "nct"}, the analytical noncentral-t inversion
-#' (\code{\link{ci_nct}}) requires an effective sample size \eqn{\tilde n}
-#' matched to the design:
-#' \itemize{
-#'   \item \strong{Paired designs} (\code{object$paired = TRUE}): \eqn{\tilde n = n_1}
-#'         (the number of pairs) and \code{df = n1 - 1}, treating \eqn{d_z}
-#'         as a one-sample/paired-t statistic.
-#'   \item \strong{Glass's \eqn{\Delta}} (\code{object$type == "glass"}):
-#'         \eqn{\tilde n = n_1} and \code{df = n1 - 1}, consistent with
-#'         standardizing by the Group 1 SD alone.
-#'   \item \strong{All other independent-groups cases}: the classical
-#'         two-sample harmonic form \eqn{\tilde n = n_1 n_2/(n_1+n_2)} and
-#'         \code{df = n1 + n2 - 2}.
+#' \subsection{Bootstrap Intervals (\code{method = "bootstrap"})}{
+#' In each bootstrap replication, observations are resampled with replacement (preserving
+#' paired structure if \code{object$paired = TRUE}), and the full quantile regularization
+#' pipeline is refitted from scratch. The \eqn{100(1 - \alpha)\%} interval is formed from the
+#' empirical percentiles \eqn{\alpha/2} and \eqn{1 - \alpha/2}.
 #' }
-#' The \code{"bootstrap"} method makes no such distributional assumption and
-#' is recommended as the default for general use, especially for skewed or
-#' small-sample data.
+#' \subsection{Noncentral-t Inversion (\code{method = "nct"})}{
+#' Computes exact confidence limits by inverting the cumulative noncentral \eqn{t}
+#' distribution (Lecoutre, 2007) with degrees of freedom and effective sample size \eqn{\tilde{n}}
+#' adapted to the design:
+#' \itemize{
+#'   \item \strong{Independent groups:} \eqn{\tilde{n} = n_1 n_2 / (n_1 + n_2)} and \eqn{\mathrm{df} = n_1 + n_2 - 2}.
+#'   \item \strong{Paired designs / Glass's \eqn{\Delta}:} \eqn{\tilde{n} = n_1} and \eqn{\mathrm{df} = n_1 - 1}.
+#' }
+#' }
 #'
-#' @return A \code{1 x 2} matrix of confidence limits.
+#' @return A numeric matrix of dimension \code{1 x 2} containing the lower and upper
+#'   confidence limits, with column names indicating the corresponding percentiles.
+#'
+#' @references
+#' Lecoutre, B. (2007). Another look at the confidence intervals for the noncentral T distribution.
+#' \emph{Journal of Modern Applied Statistical Methods}, 6(1), 107–116. \doi{10.22237/jmasm/1177992600}
+#'
+#' @examples
+#' set.seed(42)
+#' ctrl <- rlnorm(25, meanlog = 2.0, sdlog = 0.5)
+#' trt  <- rlnorm(25, meanlog = 2.3, sdlog = 0.5)
+#' fit <- d_reg(ctrl, trt)
+#'
+#' # Non-parametric Percentile Bootstrap 95% CI
+#' confint(fit, level = 0.95, method = "bootstrap", B = 500)
+#'
+#' # Analytical Noncentral-t 95% CI
+#' confint(fit, level = 0.95, method = "nct")
+#'
+#' @seealso \code{\link{d_reg}}
 #' @export
 confint.d_reg <- function(object, parm, level = 0.95,
                           method = c("bootstrap", "nct"), B = 1000L, ...) {
@@ -364,12 +387,14 @@ confint.d_reg <- function(object, parm, level = 0.95,
       if (object$paired) {
         idx <- sample.int(n1, n1, replace = TRUE)
         fb <- d_reg(x1[idx], x2[idx], degree = max(object$degrees),
-                    monotonicity = object$monotonicity, paired = TRUE, type = object$type)
+                    copula = object$copula, monotonicity = object$monotonicity,
+                    paired = TRUE, type = object$type)
       } else {
         s1 <- sample(x1, n1, replace = TRUE)
         s2 <- sample(x2, n2, replace = TRUE)
         fb <- d_reg(s1, s2, degree = max(object$degrees),
-                    monotonicity = object$monotonicity, paired = FALSE, type = object$type)
+                    copula = object$copula, monotonicity = object$monotonicity,
+                    paired = FALSE, type = object$type)
       }
       boot_d[b] <- fb$estimate
     }
@@ -399,9 +424,10 @@ print.d_reg <- function(x, digits = 3L, ...) {
   cat(strrep("-", 52), "\n", sep = "")
 
   if (x$paired) {
+    cop_lbl <- if (!is.null(x$copula) && x$copula == "gaussian") " [Gaussian]" else " [Copula-Free]"
     cat(sprintf("  Effect Size (d_reg, raw scale)    :  %.*f\n", digits, x$d_reg))
     cat(sprintf("  Standardized Mean Change (d_z)    :  %.*f\n", digits, x$d_z))
-    cat(sprintf("  Paired Hermite Correlation (r_HM) :  %.*f\n", digits, x$r_hm_paired$r_hm))
+    cat(sprintf("  Paired Hermite Correlation (r_Hermite) :  %.*f%s\n", digits, x$r_Hermite_paired$r_Hermite, cop_lbl))
     cat(sprintf("  Averaged Model SD (sigma_avg)     :  %.*f\n", digits, sqrt((x$group1$variance + x$group2$variance) / 2)))
     cat(sprintf("  Difference Model SD (sigma_diff)  :  %.*f\n", digits, x$diff_moments$sd))
   } else {

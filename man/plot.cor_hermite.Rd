@@ -2,38 +2,40 @@
 % Please edit documentation in R/plots.R
 \name{plot.cor_hermite}
 \alias{plot.cor_hermite}
-\title{Plot a Hermite-Mehler Correlation Fit}
+\title{Plot a Hermite Correlation Fit}
 \usage{
 \method{plot}{cor_hermite}(x, ...)
 }
 \arguments{
 \item{x}{An object of class \code{"cor_hermite"}.}
 
-\item{...}{Additional graphical parameters passed to the latent-copula
-scatter plot.}
+\item{...}{Additional graphical parameters passed to the latent scatter plot.}
 }
 \value{
 The object \code{x}, invisibly.
 }
 \description{
-Displays two panels: the latent Gaussian copula (standard normal scores of
-both variables, with the fitted latent correlation \eqn{\rho_z}), and the
-manifest, raw-scale scatterplot annotated with \eqn{r_{\mathrm{HM}}} and the
-shape attenuation factor \eqn{A}. The manifest panel overlays two reference
-curves: the model-implied conditional mean under the fitted Gaussian
-copula (exact, closed form via Mehler's identity) and a purely empirical
-(assumption-free) lowess smooth. Close agreement between the two supports
-the constant-correlation copula assumption underlying \eqn{r_{\mathrm{HM}}};
-systematic divergence indicates that the association between \eqn{X} and
-\eqn{Y} is not adequately summarized by a single latent correlation (e.g.
-genuine local/tail-dependent variation in the relationship).
+Displays two diagnostic panels:
+\enumerate{
+  \item \strong{Latent Normal Score Association:} Plots \eqn{Z_x} against \eqn{Z_y}.
+        For \code{copula = "gaussian"}, overlays the latent linear copula correlation \eqn{\rho_z};
+        for \code{copula = "none"}, displays the empirical rank-based dependence.
+  \item \strong{Manifest Association:} Displays the raw scatterplot annotated with
+        \eqn{r_{\mathrm{Hermite}}}. For \code{copula = "gaussian"}, overlays both the
+        model-implied conditional mean curve \eqn{\mathbb{E}[Y \mid X=x]} (exact via Mehler's identity)
+        and a non-parametric lowess smooth, displaying the shape-attenuation factor \eqn{A}.
+        For \code{copula = "none"}, displays the empirical lowess smooth without parametric assumptions.
+}
 }
 \examples{
-set.seed(1)
-z <- rnorm(60)
-x <- rnorm(60, 100, 15)
-y <- exp(0.5 * z + rnorm(60, sd = 0.5))
-fit <- cor_hermite(x, y)
-plot(fit)
+# 1. Copula-free fit
+x <- rnorm(50, 100, 15)
+y <- exp(0.5 * scale(x) + rnorm(50, sd = 0.5))
+fit_free <- cor_hermite(x, y, copula = "none")
+plot(fit_free)
+
+# 2. Gaussian copula fit with Mehler reference curve
+fit_gauss <- cor_hermite(x, y, copula = "gaussian")
+plot(fit_gauss)
 
 }

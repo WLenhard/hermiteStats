@@ -80,6 +80,54 @@ NULL
   H_mat
 }
 
+#' Evaluate Probabilists' Hermite Basis up to order k
+#' @noRd
+.hermite_eval_basis <- function(z, degree) {
+  n <- length(z)
+  H <- matrix(0.0, nrow = n, ncol = degree + 1L)
+  H[, 1L] <- 1.0
+  if (degree >= 1L) H[, 2L] <- z
+  if (degree >= 2L) {
+    for (k in 2:degree) {
+      H[, k + 1L] <- z * H[, k] - (k - 1L) * H[, k - 1L]
+    }
+  }
+  H
+}
+
+#' Assemble a cor_hermite result from two already-fitted quantile models
+#' @noRd
+.cor_hermite_assemble <- function(fit_x, fit_y, poly_degree_requested = 3L,
+                                  copula = "none", monotonicity = "relaxed",
+                                  ties_method = "average", trim = 0) {
+  pair <- .cor_hermite_pair(fit_x, fit_y, copula = copula, trim = trim)
+  res <- list(
+    r_Hermite                  = pair$r_Hermite,
+    copula                = copula,
+    rho_z                 = pair$rho_z,
+    attenuation           = pair$attenuation,
+    cov_xy                = pair$cov_xy,
+    var_x                 = pair$var_x,
+    var_y                 = pair$var_y,
+    mean_x                = pair$mean_x,
+    mean_y                = pair$mean_y,
+    degrees               = pair$degrees,
+    poly_degree_requested = poly_degree_requested,
+    monotonicity          = monotonicity,
+    ties_method           = ties_method,
+    trim                  = trim,
+    n                     = length(fit_x$x),
+    fit_x                 = fit_x,
+    fit_y                 = fit_y,
+    cross_moments         = pair$cross_moments,
+    rho_z_reference       = pair$rho_z_reference,
+    x                     = fit_x$x,
+    y                     = fit_y$x
+  )
+  class(res) <- "cor_hermite"
+  res
+}
+
 #' Closed-form distributional moments of a fitted quantile polynomial
 #'
 #' Given the monomial coefficients of a fitted quantile function

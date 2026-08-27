@@ -17,7 +17,7 @@ for distributional moments (mean, variance, skewness and kurtosis) and
 based on this, for two of the most fundamental statistics in
 quantitative research:
 
-1.  **The Hermite-Mehler Correlation (r_HM):** a distribution-robust
+1.  **The Hermite Correlation (r_Hermite):** a distribution-robust
     estimator of the raw-scale Pearson correlation coefficient.
 2.  **The Distribution-Free Effect Size (d_reg):** a robust standardized
     mean difference for independent and paired samples that retains the
@@ -30,9 +30,10 @@ changing the quantity being estimated, discarding genuine tail variance
 in the process. `hermiteStats` instead models the empirical quantile
 function via **regularized monotone polynomial smoothing** and derives
 exact distributional moments in closed algebraic form using
-**Probabilists’ Hermite polynomials** and **Mehler’s (1866) identity** —
-recovering the original, interpretable estimand while gaining the
-stability of a robust method.
+**Probabilists’ Hermite polynomials** and either without any prior
+assumptions, or - in case of the additional Gaussian copula assumption -
+based on **Mehler’s (1866) identity**. It recovers the original,
+interpretable estimand while gaining the stability of a robust method.
 
 ------------------------------------------------------------------------
 
@@ -55,7 +56,7 @@ stability of a robust method.
   - [Estimating Distributional
     Moments](#estimating-distributional-moments)
   - [Hermite-Mehler Correlation
-    (r_HM)](#hermite-mehler-correlation-r_hm)
+    (r_Hermite)](#hermite-mehler-correlation-r_Hermite)
   - [Correlation Matrices and Multivariate
     Analysis](#correlation-matrices-and-multivariate-analysis)
   - [Distribution-Free Effect Sizes
@@ -82,9 +83,6 @@ stability of a robust method.
   classical Pearson’s *r* / Cohen’s *d* when parametric assumptions
   hold, so there is essentially nothing to lose by using the regularized
   estimator as a default choice.
-- **Shape Attenuation Diagnostic (A):** Quantifies how much of the
-  observed association is suppressed purely by marginal shape mismatch
-  (Hoeffding-Fréchet bounds).
 - **Flexible Monotonicity Enforcement:** Supports both a relaxed,
   rank-concordance-based check and a strict, analytically verified
   monotonicity constraint (root-finding on the fitted derivative).
@@ -152,37 +150,67 @@ $$\gamma_1 = \frac{\mathbb{E}[(X-\mu)^3]}{\sigma^3}, \qquad \gamma_2 = \frac{\ma
 All four moments are obtained this way in exact closed algebraic form,
 with no numerical integration at any step.
 
-### 3. Mehler’s Bilinear Expansion for Covariance
+### 3. Covariance Estimation on the Basis of Probabilists’ Hermite Polynomials
 
-Under a latent Gaussian copula with latent correlation
-$\rho_z = \text{cor}(Z_x, Z_y)$, **Mehler’s (1866) identity** states
-that cross-products of Hermite polynomials of different order vanish in
-expectation, and matching orders collapse to a single deterministic
-power of $\rho_z$:
+Two different variants for calculating covariance and thus the resulting
+$r_{\text{HM}}$ are available:
 
-$$\mathbb{E}\left[ He_m(Z_x) He_n(Z_y) \right] = \delta_{mn} \, m! \, \rho_z^m$$
+#### Variant A: Copula-Free Empirical Cross-Moments (`copula = "none"`, Default)
 
-The manifest covariance is therefore the sum over matching Hermite
-orders of the two fitted quantile polynomials ($\mathbf{a}$ for $X$,
-$\mathbf{b}$ for $Y$):
+The first variant is based directly on the fitted raw scores
+($\hat{x}_i, \hat{y}_i$) and the regularized Hermite population moments.
+It is completely free of prior assumptions regarding the joint
+dependence structure (copula) and marginal shape. It yields lower MSE
+and higher precision across a vast range of distributional scenarios
+(especially in sample sizes of $n < 100$):
 
-$$\text{Cov}(X, Y) = \sum_{m=1}^{\min(k_x, k_y)} a_m b_m \, m! \, \rho_z^m$$
+$$\widehat{\text{Cov}}(X, Y) = \frac{\sum_{i=1}^n \left(\hat{x}_i - \hat{\mu}_x\right)\left(\hat{y}_i - \hat{\mu}_y\right)}{n}$$
 
-which, combined with the univariate variances from Section 2, yields the
-**Hermite-Mehler correlation (r_HM)**:
+where: \*
+$\hat{x}_i = f(Z_{x, i}) = \sum_{j=0}^{k_x} \beta_{x, j} Z_{x, i}^j$ is
+the fitted value for observation $i$ from the monotone quantile model.
+\* $\hat{\mu}_x = a_0$ is the regularized population mean derived from
+the Hermite polynomial representation.
 
-$$r_{\text{HM}} = \frac{\sum_{m=1}^{\min(k_x, k_y)} a_m b_m \, m! \, \rho_z^m}{\sqrt{\left(\sum_{m=1}^{k_x} a_m^2 m!\right)\left(\sum_{m=1}^{k_y} b_m^2 m!\right)}}$$
+Standardizing by the regularized marginal standard deviations
+($\hat{\sigma}_x, \hat{\sigma}_y$) yields the **Copula-Free Hermite
+Correlation**:
+
+$$r_{\text{Hermite}} = \frac{\widehat{\text{Cov}}(X, Y)}{\hat{\sigma}_x \, \hat{\sigma}_y} = \frac{\frac{1}{n} \sum_{i=1}^n \left(\hat{x}_i - \hat{\mu}_x\right)\left(\hat{y}_i - \hat{\mu}_y\right)}{\sqrt{\left(\sum_{m=1}^{k_x} a_m^2 \, m!\right)\left(\sum_{m=1}^{k_y} b_m^2 \, m!\right)}}$$
+
+------------------------------------------------------------------------
+
+#### Variant B: Parametric Gaussian Copula via Mehler’s Identity (`copula = "gaussian"`)
+
+The second variant evaluates the cross-moment expectations analytically
+under the assumption that the latent normal scores $(Z_x, Z_y)$ follow a
+bivariate normal distribution with correlation
+$\rho_z = \text{cor}(Z_x, Z_y)$. By **Mehler’s (1866) bilinear
+expansion**, all cross-orders of different degrees vanish
+($\mathbb{E}[He_m(Z_x) He_n(Z_y)] = \delta_{mn} m! \rho_z^m$), yielding
+the closed-form covariance:
+
+$$\widehat{\text{Cov}}_{\text{Gauss}}(X, Y) = \sum_{m=1}^{\min(k_x, k_y)} a_m b_m \, m! \, \rho_z^m$$
+
+and the corresponding **Gaussian-Copula Hermite Correlation**:
+
+$$r_{\text{Hermite, Gauss}} = \frac{\sum_{m=1}^{\min(k_x, k_y)} a_m b_m \, m! \, \rho_z^m}{\sqrt{\left(\sum_{m=1}^{k_x} a_m^2 \, m!\right)\left(\sum_{m=1}^{k_y} b_m^2 \, m!\right)}}$$
+
+This variant also yields the **Shape Attenuation Factor**
+$A = r_{\text{Hermte}} / \rho_z$, which quantifies the mathematical
+ceiling imposed purely by marginal shape incompatibility
+(Hoeffding–Fréchet bounds).
 
 ### 4. Disentangling Construct Association from Scale Attenuation (A)
 
 This framework cleanly separates two conceptually distinct quantities:
 the pure latent dependency $\rho_z$ (the Gaussian copula parameter,
 unaffected by either variable’s shape), and the manifest linear
-correlation $r_{\text{HM}}$ (which *is* affected by shape, exactly as
-classical Pearson’s $r$ would be). Their ratio defines the **Shape
+correlation $r_{\text{Hermite}}$ (which *is* affected by shape, exactly
+as classical Pearson’s $r$ would be). Their ratio defines the **Shape
 Attenuation Factor (A)**:
 
-$$A = \frac{r_{\text{HM}}}{\rho_z}$$
+$$A = \frac{r_{\text{Hermite}}}{\rho_z}$$
 
 - If $A \approx 1.0$, the marginal distributions do not meaningfully
   constrain the correlation.
@@ -209,7 +237,7 @@ theoretically linked to the marginal moments and the paired
 Hermite-Mehler correlation via the general variance-of-a-difference
 identity
 
-$$\hat{\sigma}_D = \sqrt{\hat{\sigma}_1^2 + \hat{\sigma}_2^2 - 2\, r_{\text{HM}} \, \hat{\sigma}_1 \hat{\sigma}_2}$$
+$$\hat{\sigma}_D = \sqrt{\hat{\sigma}_1^2 + \hat{\sigma}_2^2 - 2\, r_{\text{Hermite}} \, \hat{\sigma}_1 \hat{\sigma}_2}$$
 
 (no equal-variance assumption required), which makes explicit why a
 stronger paired correlation mechanically shrinks the variance of the
@@ -330,7 +358,7 @@ regularized and raw estimates are expected to agree closely —
 contaminated data, and whenever skewness/kurtosis are of direct
 interest, as the remaining examples below illustrate.
 
-### Hermite-Mehler Correlation (r_HM)
+### Hermite Correlation (r_Hermite)
 
 `cor_hermite()` estimates the raw-scale Pearson correlation between two
 variables that may have very different marginal shapes — here, a roughly
@@ -348,21 +376,25 @@ y <- exp(0.4 * z_shared + rnorm(n, sd = 0.5))    # right-skewed (lognormal)
 fit_cor <- cor_hermite(x, y, conf_level = 0.95, ci_method = "fisher")
 print(fit_cor)
 #> 
-#>   Hermite-Mehler Pearson Correlation (r_HM)
-#> ------------------------------------------------
-#>   Hermite Correlation (r_HM) :  0.571
-#>   Latent Copula (rho_z)      :  0.631
-#>   Shape Attenuation (A)      :  0.905
+#>   Distribution-Robust Hermite Correlation
+#> ----------------------------------------------------
+#>   Hermite Correlation (r_Hermite) :  0.550
+#>   Copula Model               :  Copula-Free (empirical cross-moments)
 #>   Polynomial Degrees Fitted  :  X = 3, Y = 3
 #>   Monotonicity Check         :  relaxed
-#>   95% CI (fisher): [0.371, 0.720]
+#>   95% CI (fisher): [0.345, 0.706]
 ```
 
-`rho_z` is the latent Gaussian copula correlation; `r_HM` is the
-corresponding raw-scale Pearson correlation implied by the fitted
-marginal shapes; and `A = r_HM / rho_z` quantifies how much of that
-latent association survives on the manifest scale (see [Mathematical
-Foundations
+The Hermite correlation makes no assumption on the distributional shape
+and the copula (the type of bivariate dependence structure). If the
+copula is Gaussian - a decision to be made on the basis of theoretical
+considerations - this can be specified via `copula = "gauss"`, leading
+to a further decrease of MSE. In that case, further parameters are
+available: `rho_z` is the latent Gaussian copula correlation;
+`r_Hermite` is the corresponding raw-scale Pearson correlation implied
+by the fitted marginal shapes; and `A = r_Hermite / rho_z` quantifies
+how much of that latent association survives on the manifest scale (see
+[Mathematical Foundations
 §4](#4-disentangling-construct-association-from-scale-attenuation-a)).
 `summary(fit_cor)` additionally reports the implied means, standard
 deviations, and covariance on the raw scale.
@@ -378,33 +410,20 @@ pairwise matrices — useful as a drop-in, shape-robust alternative to
 R_hermite <- cor_hermite(iris[, 1:4])
 print(R_hermite)
 #> 
-#>   Hermite-Mehler Correlation Matrix (r_HM):
+#>   Hermite Correlation Matrix (r_Hermite; Copula-Free):
+#> ----------------------------------------------------
 #>              Sepal.Length Sepal.Width Petal.Length Petal.Width
-#> Sepal.Length        1.000      -0.091        0.842       0.744
-#> Sepal.Width        -0.091       1.000       -0.258      -0.224
-#> Petal.Length        0.842      -0.258        1.000       0.844
-#> Petal.Width         0.744      -0.224        0.844       1.000
+#> Sepal.Length        1.000      -0.105        0.863       0.813
+#> Sepal.Width        -0.105       1.000       -0.302      -0.288
+#> Petal.Length        0.863      -0.302        1.000       0.934
+#> Petal.Width         0.813      -0.288        0.934       1.000
 #> 
-#>   Latent Copula Correlation Matrix (rho_z):
+#>   Hermite Covariance Matrix (cov_Hermite; Diagonal: Variances):
 #>              Sepal.Length Sepal.Width Petal.Length Petal.Width
-#> Sepal.Length        1.000      -0.093        0.868       0.777
-#> Sepal.Width        -0.093       1.000       -0.269      -0.237
-#> Petal.Length        0.868      -0.269        1.000       0.864
-#> Petal.Width         0.777      -0.237        0.864       1.000
-#> 
-#>   Shape Attenuation Factor Matrix (A = r_HM / rho_z):
-#>              Sepal.Length Sepal.Width Petal.Length Petal.Width
-#> Sepal.Length        1.000       0.987        0.971       0.958
-#> Sepal.Width         0.987       1.000        0.960       0.944
-#> Petal.Length        0.971       0.960        1.000       0.976
-#> Petal.Width         0.958       0.944        0.976       1.000
-#> 
-#>   Hermite-Mehler Covariance Matrix (cov_HM; Diagonale: Variances):
-#>              Sepal.Length Sepal.Width Petal.Length Petal.Width
-#> Sepal.Length        0.683      -0.033        1.181       0.460
-#> Sepal.Width        -0.033       0.193       -0.192      -0.074
-#> Petal.Length        1.181      -0.192        2.883       1.071
-#> Petal.Width         0.460      -0.074        1.071       0.559
+#> Sepal.Length        0.683      -0.038        1.210       0.502
+#> Sepal.Width        -0.038       0.193       -0.225      -0.095
+#> Petal.Length        1.210      -0.225        2.883       1.186
+#> Petal.Width         0.502      -0.095        1.186       0.559
 #> 
 #>   Regularized Marginal Moments:
 #>      Variable  Mean Variance    SD Skewness Degree
@@ -467,7 +486,7 @@ print(fit_paired)
 #> ----------------------------------------------------
 #>   Effect Size (d_reg, raw scale)    :  0.406
 #>   Standardized Mean Change (d_z)    :  3.188
-#>   Paired Hermite Correlation (r_HM) :  0.930
+#>   Paired Hermite Correlation (r_Hermite) :  0.928 [Copula-Free]
 #>   Averaged Model SD (sigma_avg)     :  12.505
 #>   Difference Model SD (sigma_diff)  :  1.592
 #>   Standardizer Used (denominator)   :  12.505
@@ -481,8 +500,8 @@ print(fit_paired)
 `d_reg` (raw scale) is directly comparable to independent-groups effect
 sizes, e.g. in a meta-analysis mixing designs; `d_z` is standardized by
 the variability of the change scores themselves and will be larger
-whenever the paired Hermite-Mehler correlation is strong (see
-[Mathematical Foundations §5](#5-distribution-free-effect-size-d_reg)).
+whenever the paired Hermite correlation is strong (see [Mathematical
+Foundations §5](#5-distribution-free-effect-size-d_reg)).
 
 ### Diagnostic Visualizations
 
@@ -501,10 +520,10 @@ plot(fit)
 
 A `cor_hermite` fit shows the latent copula on the left, and the
 manifest association on the right — with both the model-implied
-conditional mean curve (exact, via Mehler’s identity) and a purely
-empirical lowess smooth, so that curvature attributable to marginal
-shape can be visually distinguished from a genuine departure from the
-constant-correlation copula assumption:
+conditional mean curve and a purely empirical lowess smooth, so that
+curvature attributable to marginal shape can be visually distinguished
+from a genuine departure from the constant-correlation copula
+assumption:
 
 ``` r
 plot(fit_cor)
@@ -539,7 +558,7 @@ available.
   url    = {https://github.com/WLenhard/hermiteStats}
 }
 @Unpublished{lenhard2026hermite,
-  title  = {The {Hermite-Mehler} Correlation: A Distribution-Robust Estimator of the {Pearson} Correlation Coefficient},
+  title  = {The {Hermite} Correlation: A Distribution-Robust Estimator of the {Pearson} Correlation Coefficient},
   author = {Wolfgang Lenhard and Alexandra Lenhard},
   note   = {Manuscript submitted for publication}
 }
