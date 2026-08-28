@@ -162,13 +162,12 @@ dependence structure (copula) and marginal shape. It yields lower MSE
 and higher precision across a vast range of distributional scenarios
 (especially in sample sizes of $n < 100$):
 
-$$\widehat{\text{Cov}}(X, Y) = \frac{\sum_{i=1}^n \left(\hat{x}_i - \hat{\mu}_x\right)\left(\hat{y}_i - \hat{\mu}_y\right)}{n}$$
+$$\widehat{\text{Cov}}(X, Y) = \frac{1}{n} \sum_{i=1}^n \left(\hat{x}_i - \hat{\mu}_x\right)\left(\hat{y}_i - \hat{\mu}_y\right)$$
 
-where:
-
-$$\hat{x}_i = f(Z_{x, i}) = \sum_{j=0}^{k_x} \beta_{x, j} Z_{x, i}^j$$
-is the fitted value for observation $i$ from the monotone quantile model
-(see step 1). $\hat{\mu}_x = a_0$ is the regularized population mean
+where
+$\hat{x}_i = f(Z_{x, i}) = \sum_{j=0}^{k_x} \beta_{x, j} Z_{x, i}^j$ is
+the fitted value for observation $i$ from the monotone quantile model
+(see step 1), and $\hat{\mu}_x = a_0$ is the regularized population mean
 derived from the Hermite polynomial representation.
 
 Standardizing by the regularized marginal standard deviations
@@ -196,7 +195,7 @@ and the corresponding **Gaussian-Copula Hermite Correlation**:
 $$r_{\text{Hermite, Gauss}} = \frac{\sum_{m=1}^{\min(k_x, k_y)} a_m b_m \, m! \, \rho_z^m}{\sqrt{\left(\sum_{m=1}^{k_x} a_m^2 \, m!\right)\left(\sum_{m=1}^{k_y} b_m^2 \, m!\right)}}$$
 
 This variant also yields the **Shape Attenuation Factor**
-$A = r_{\text{Hermte}} / \rho_z$, which quantifies the mathematical
+$A = r_{\text{Hermite}} / \rho_z$, which quantifies the mathematical
 ceiling imposed purely by marginal shape incompatibility
 (Hoeffding–Fréchet bounds).
 
@@ -250,8 +249,8 @@ change scores, and hence inflates $d_z$ relative to $d_{\text{reg}}$.
 directly from GitHub:
 
 ``` r
-# install.packages(\"remotes\")
-remotes::install_github(\"WLenhard/hermiteStats\")
+# install.packages("remotes")
+remotes::install_github("WLenhard/hermiteStats")
 ```
 
 The package depends only on base R and requires R \>= 3.5.0 — there are

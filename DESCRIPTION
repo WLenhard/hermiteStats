@@ -25,7 +25,7 @@ Description: Provides distribution-robust estimation and statistical inference
     and Isserlis' (1918) <doi:10.1093/biomet/12.1-2.134> theorem. For bivariate
     data, the joint covariance is computed analytically either completely 
     without prior assumptions or under a latent Gaussian copula via Mehler's 
-    (1866) <doi:10.1515/crll.1866.66.161> bilinear expansion.
+    (1866) <doi:10.1515/crll.1866.66.161> Identity.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Depends:
