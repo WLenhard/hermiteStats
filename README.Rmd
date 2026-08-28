@@ -106,7 +106,10 @@ The first variant is based directly on the fitted raw scores ($\hat{x}_i, \hat{y
 
 $$\widehat{\text{Cov}}(X, Y) = \frac{\sum_{i=1}^n \left(\hat{x}_i - \hat{\mu}_x\right)\left(\hat{y}_i - \hat{\mu}_y\right)}{n}$$
 
-where: $\hat{x}_i = f(Z_{x, i}) = \sum_{j=0}^{k_x} \beta_{x, j} Z_{x, i}^j$ is the fitted value for observation $i$ from the monotone quantile model. $\hat{\mu}_x = a_0$ is the regularized population mean derived from the Hermite polynomial representation.
+where: 
+
+$$\hat{x}_i = f(Z_{x, i}) = \sum_{j=0}^{k_x} \beta_{x, j} Z_{x, i}^j$$
+is the fitted value for observation $i$ from the monotone quantile model (see step 1). $\hat{\mu}_x = a_0$ is the regularized population mean derived from the Hermite polynomial representation.
 
 Standardizing by the regularized marginal standard deviations ($\hat{\sigma}_x, \hat{\sigma}_y$) yields the **Copula-Free Hermite Correlation**:
 
