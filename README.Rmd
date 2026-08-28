@@ -78,7 +78,7 @@ so that the original metric and tail shape of the data are preserved rather than
 
 ### 2. The Orthogonal Hermite Basis and Univariate Moments
 
-Standard powers $Z^j$ are not orthogonal under the Gaussian measure, which makes their coefficients awkward for moment extraction. Re-expressing the polynomial in the basis of **monic Probabilists' Hermite polynomials** $He_m(z)$ (Hermite, 1864),
+Standard powers $Z^j$ are not orthogonal under the Gaussian measure, which makes their coefficients awkward for moment extraction. Re-expressing the polynomial in the basis of **monic Probabilists' Hermite polynomials** $He_m(z)$ (Hermite, 1866),
 
 $$He_0(z) = 1, \quad He_1(z) = z, \quad He_2(z) = z^2 - 1, \quad He_3(z) = z^3 - 3z, \quad \dots$$
 
@@ -98,7 +98,7 @@ All four moments are obtained this way in exact closed algebraic form, with no n
 
 ### 3. Covariance Estimation on the Basis of Probabilists' Hermite Polynomials
 
-Two different variants for calculating covariance and thus the resulting $r_{\text{HM}}$ are available:
+Two different variants for calculating covariance and thus the resulting $r_{\text{Hermite}}$ are available:
 
 #### Variant A: Copula-Free Empirical Cross-Moments (`copula = "none"`, Default)
 
@@ -106,9 +106,7 @@ The first variant is based directly on the fitted raw scores ($\hat{x}_i, \hat{y
 
 $$\widehat{\text{Cov}}(X, Y) = \frac{\sum_{i=1}^n \left(\hat{x}_i - \hat{\mu}_x\right)\left(\hat{y}_i - \hat{\mu}_y\right)}{n}$$
 
-where:
-* $\hat{x}_i = f(Z_{x, i}) = \sum_{j=0}^{k_x} \beta_{x, j} Z_{x, i}^j$ is the fitted value for observation $i$ from the monotone quantile model.
-* $\hat{\mu}_x = a_0$ is the regularized population mean derived from the Hermite polynomial representation.
+where: $\hat{x}_i = f(Z_{x, i}) = \sum_{j=0}^{k_x} \beta_{x, j} Z_{x, i}^j$ is the fitted value for observation $i$ from the monotone quantile model. $\hat{\mu}_x = a_0$ is the regularized population mean derived from the Hermite polynomial representation.
 
 Standardizing by the regularized marginal standard deviations ($\hat{\sigma}_x, \hat{\sigma}_y$) yields the **Copula-Free Hermite Correlation**:
 
@@ -348,7 +346,7 @@ If you use `hermiteStats` in published research, please cite both the software a
 * Cohen, J. (1988). *Statistical Power Analysis for the Behavioral Sciences* (2nd ed.). Lawrence Erlbaum Associates.
 * Hazen, A. (1914). Storage to be provided in impounding municipal water supply. *Transactions of the American Society of Civil Engineers*, 77(1), 1539–1640.
 * Hedges, L. V. (1981). Distribution theory for Glass's estimator of effect size and related estimators. *Journal of Educational Statistics*, 6(2), 107–128. https://doi.org/10.3102/10769986006002107
-* Hermite, C. (1864). Sur un nouveau développement en série des fonctions. *Comptes Rendus de l'Académie des Sciences, Paris*, 58, 93–100.
+* Hermite, C. (1866). Sur un nouveau développement en série des fonctions. *Comptes Rendus de l'Académie des Sciences, Paris*, 58, 93–100.
 * Isserlis, L. (1918). On a formula for the product-moment coefficient of any order of a normal frequency distribution. *Biometrika*, 12(1/2), 134–139. https://doi.org/10.1093/biomet/12.1-2.134
 * Mehler, F. G. (1866). Ueber die Entwicklung einer Function von beliebig vielen Variabeln nach Laplaceschen Functionen höherer Ordnung. *Journal für die reine und angewandte Mathematik*, 66, 161–176. https://doi.org/10.1515/crll.1866.66.161
 * Sklar, M. (1959). Fonctions de répartition à n dimensions et leurs marges. *Publications de l'Institut de Statistique de l'Université de Paris*, 8, 229–231.

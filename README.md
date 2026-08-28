@@ -119,7 +119,7 @@ is detected.
 Standard powers $Z^j$ are not orthogonal under the Gaussian measure,
 which makes their coefficients awkward for moment extraction.
 Re-expressing the polynomial in the basis of **monic Probabilists’
-Hermite polynomials** $He_m(z)$ (Hermite, 1864),
+Hermite polynomials** $He_m(z)$ (Hermite, 1866),
 
 $$He_0(z) = 1, \quad He_1(z) = z, \quad He_2(z) = z^2 - 1, \quad He_3(z) = z^3 - 3z, \quad \dots$$
 
@@ -151,7 +151,7 @@ with no numerical integration at any step.
 ### 3. Covariance Estimation on the Basis of Probabilists’ Hermite Polynomials
 
 Two different variants for calculating covariance and thus the resulting
-$r_{\text{HM}}$ are available:
+$r_{\text{Hermite}}$ are available:
 
 #### Variant A: Copula-Free Empirical Cross-Moments (`copula = "none"`, Default)
 
@@ -164,11 +164,11 @@ and higher precision across a vast range of distributional scenarios
 
 $$\widehat{\text{Cov}}(X, Y) = \frac{\sum_{i=1}^n \left(\hat{x}_i - \hat{\mu}_x\right)\left(\hat{y}_i - \hat{\mu}_y\right)}{n}$$
 
-where: \*
+where:
 $\hat{x}_i = f(Z_{x, i}) = \sum_{j=0}^{k_x} \beta_{x, j} Z_{x, i}^j$ is
 the fitted value for observation $i$ from the monotone quantile model.
-\* $\hat{\mu}_x = a_0$ is the regularized population mean derived from
-the Hermite polynomial representation.
+$\hat{\mu}_x = a_0$ is the regularized population mean derived from the
+Hermite polynomial representation.
 
 Standardizing by the regularized marginal standard deviations
 ($\hat{\sigma}_x, \hat{\sigma}_y$) yields the **Copula-Free Hermite
@@ -646,7 +646,7 @@ available.
   effect size and related estimators. *Journal of Educational
   Statistics*, 6(2), 107–128.
   <https://doi.org/10.3102/10769986006002107>
-- Hermite, C. (1864). Sur un nouveau développement en série des
+- Hermite, C. (1866). Sur un nouveau développement en série des
   fonctions. *Comptes Rendus de l’Académie des Sciences, Paris*, 58,
   93–100.
 - Isserlis, L. (1918). On a formula for the product-moment coefficient
