@@ -14,8 +14,7 @@ MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.or
 
 **`hermiteStats`** provides distribution-robust, regularized estimators
 for distributional moments (mean, variance, skewness and kurtosis) and
-based on this, for two of the most fundamental statistics in
-quantitative research:
+based on this, for fundamental statistics in quantitative research:
 
 1.  **The Hermite Correlation (r_Hermite):** a distribution-robust
     estimator of the raw-scale Pearson correlation coefficient.
@@ -23,17 +22,16 @@ quantitative research:
     mean difference for independent and paired samples that retains the
     metric and interpretation of Cohen’s *d* / Hedges’ *g*.
 
-Both methods address a long-standing dilemma in robust statistics:
-classical remedies for non-normal data — trimming, Winsorizing, or
-converting to ranks — typically restore stability only by silently
-changing the quantity being estimated, discarding genuine tail variance
-in the process. `hermiteStats` instead models the empirical quantile
-function via **regularized monotone polynomial smoothing** and derives
-exact distributional moments in closed algebraic form using
-**Probabilists’ Hermite polynomials** and either without any prior
-assumptions, or - in case of the additional Gaussian copula assumption -
-based on **Mehler’s (1866) identity**. It recovers the original,
-interpretable estimand while gaining the stability of a robust method.
+The methods address a dilemma in robust statistics: classical solutions
+for non-normal data — trimming, Winsorizing, or converting to ranks —
+typically restore stability only by silently changing the quantity being
+estimated, discarding genuine tail variance in the process.
+`hermiteStats` instead models the empirical quantile function via
+regularized monotone polynomial smoothing and derives exact
+distributional moments in closed algebraic form using Probabilists’
+Hermite polynomials. It recovers the original, interpretable estimands
+of distributional moments, while gaining the stability of a robust
+method.
 
 ------------------------------------------------------------------------
 
@@ -433,6 +431,70 @@ print(R_hermite)
 #>   Petal.Width 1.201    0.559 0.748    0.008      3
 ```
 
+### Partial and semipartial correlation
+
+To evaluate the association between two variables while controlling for
+one or more confounding covariates $\mathbf{Z}$, `pcor_hermite()`
+computes the conditional covariance matrix (or inverted precision
+matrix) directly from the regularized Hermite moments. This yields
+distribution-robust partial ($r_{XY \cdot \mathbf{Z}}$) and semipartial
+($r_{X(Y \cdot \mathbf{Z})}$) correlations. It supports single or
+multiple continuous covariates as well as full partial correlation
+matrices for multivariate data:
+
+``` r
+# Simulate X, Y, and a confounder Z with skewed distributions
+set.seed(42)
+z <- rlnorm(60, meanlog = 1, sdlog = 0.5)
+x <- 0.6 * z + rnorm(60, sd = 2)
+y <- 0.7 * z + rnorm(60, sd = 2)
+
+# Raw correlation (confounded by Z)
+cor_hermite(x, y)
+#> 
+#>   Distribution-Robust Hermite Correlation
+#> ----------------------------------------------------
+#>   Hermite Correlation (r_Hermite) :  0.148
+#>   Copula Model               :  Copula-Free (empirical cross-moments)
+#>   Polynomial Degrees Fitted  :  X = 3, Y = 3
+#>   Monotonicity Check         :  relaxed
+
+# Partial correlation controlling for Z (Copula-Free)
+# If you expect a Gaussian copula, add 'copula = "gaussian"'
+pcor_hermite(x, y, z = z, conf_level = 0.95)
+#> 
+#>   Distribution-Robust Partial Correlation (r_Hermite)
+#> ------------------------------------------------------
+#>   Estimate (r_Hermite.z)          :  -0.056
+#>   Copula Mode                :  Copula-Free
+#>   Controlled Covariates (k)  :  1
+#>   Sample Size (n)            :  60
+#>   95% CI (fisher): [-0.307, 0.203]
+
+# Semipartial correlation controlling for Z in Y only
+pcor_hermite(x, y, z = z, semi = TRUE, conf_level = 0.95)
+#> 
+#>   Distribution-Robust Semipartial (Part) Correlation (r_Hermite)
+#> ------------------------------------------------------
+#>   Estimate (r_Hermite.z)          :  -0.051
+#>   Copula Mode                :  Copula-Free
+#>   Controlled Covariates (k)  :  1
+#>   Sample Size (n)            :  60
+#>   95% CI (fisher): [-0.303, 0.208]
+
+# Full Partial Correlation Matrix for iris dataset (every entry is the
+# partial correlation after removing the influence of all remaining variables)
+pcor_hermite(iris[, 1:4])
+#> 
+#>   Hermite Partial Correlation Matrix (r_Hermite.z; Copula-Free):
+#> --------------------------------------------------------
+#>              Sepal.Length Sepal.Width Petal.Length Petal.Width
+#> Sepal.Length        1.000       0.323        0.537       0.047
+#> Sepal.Width         0.323       1.000       -0.250      -0.032
+#> Petal.Length        0.537      -0.250        1.000       0.757
+#> Petal.Width         0.047      -0.032        0.757       1.000
+```
+
 ### Distribution-Free Effect Sizes (d_reg)
 
 `d_reg()` estimates a standardized mean difference that keeps Cohen’s
@@ -516,7 +578,7 @@ moments:
 plot(fit)
 ```
 
-<img src="man/figures/README-unnamed-chunk-12-1.png" alt="" width="100%" />
+<img src="man/figures/README-unnamed-chunk-13-1.png" alt="" width="100%" />
 
 A `cor_hermite` fit shows the latent copula on the left, and the
 manifest association on the right — with both the model-implied
@@ -529,7 +591,7 @@ assumption:
 plot(fit_cor)
 ```
 
-<img src="man/figures/README-unnamed-chunk-13-1.png" alt="" width="100%" />
+<img src="man/figures/README-unnamed-chunk-14-1.png" alt="" width="100%" />
 
 A `d_reg` fit shows both groups’ empirical densities (with regularized
 means and the effect size annotated) alongside their regularized
@@ -539,7 +601,7 @@ quantile maps overlaid on a single panel:
 plot(fit_d)
 ```
 
-<img src="man/figures/README-unnamed-chunk-14-1.png" alt="" width="100%" />
+<img src="man/figures/README-unnamed-chunk-15-1.png" alt="" width="100%" />
 
 ## Citation
 

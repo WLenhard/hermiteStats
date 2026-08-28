@@ -43,7 +43,7 @@ confidence intervals for a fitted \code{"cor_hermite"} object.
 }
 \details{
 When \code{method = "fisher"}, the interval is obtained by inverting the Fisher
-\eqn{z}-transformation on \eqn{r_{\mathrm{HM}}}. When \code{method = "bootstrap"},
+\eqn{z}-transformation on \eqn{r_{\mathrm{Hermite}}}. When \code{method = "bootstrap"},
 the function calls \code{\link{cor_hermite_boot_ci}}, refitting the model from scratch
 in each bootstrap replicate while inheriting the original polynomial degree and
 copula settings.

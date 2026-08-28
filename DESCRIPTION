@@ -1,7 +1,7 @@
 Package: hermiteStats
 Type: Package
 Title: Distribution-Robust Statistics via Hermite Polynomial Quantile Modeling
-Version: 0.1.0
+Version: 0.2.0
 Authors@R: c(
     person("Wolfgang", "Lenhard", 
            email = "wolfgang.lenhard@uni-wuerzburg.de", 
@@ -13,27 +13,19 @@ Authors@R: c(
            comment = c(ORCID = "0000-0001-8680-4381"))
   )
 Description: Provides distribution-robust estimation and statistical inference
-    for bivariate correlations and standardized mean differences (effect sizes)
-    without requiring distributional assumptions. Traditional robust methods
-    often achieve stability by trimming, Winsorizing, or converting data to
-    ranks, thereby inadvertently changing the target estimand and discarding
+    for distributional moments, bivariate correlations and standardized mean 
+    differences (effect sizes) without requiring distributional assumptions. 
+    Traditional robust methods often achieve stability by trimming, Winsorizing, 
+    or to rank conversion, thereby changing the target estimand and discarding
     authentic tail variance. The methods in this package map empirical data to
     standard normal scores via rank-based inverse-normal transformation (Normal
     Quantile Transformation), model the empirical quantile functions using
     regularized monotone polynomials, and extract distributional moments in
     exact closed algebraic form using monic Probabilists' Hermite polynomials
     and Isserlis' (1918) <doi:10.1093/biomet/12.1-2.134> theorem. For bivariate
-    data, the joint covariance is computed analytically under a latent Gaussian
-    copula via Mehler's (1866) <doi:10.1515/crll.1866.66.161> bilinear
-    expansion. The package provides: (1) The Hermite-Mehler correlation (r_HM),
-    the latent copula correlation, and the shape-attenuation factor (A), which
-    quantifies the ceiling on manifest association imposed by marginal shape
-    mismatch (Hoeffding-Frechet bounds); (2) The distribution-free effect size
-    (d_reg) for independent and paired samples, retaining the interpretation
-    and metric of Cohen's d / Hedges' g while drastically reducing sampling
-    variance and mean squared error (MSE) in small samples (n < 50); and (3)
-    Analytical and bootstrap confidence intervals alongside diagnostic
-    visualization tools.
+    data, the joint covariance is computed analytically either completely 
+    without prior assumptions or under a latent Gaussian copula via Mehler's 
+    (1866) <doi:10.1515/crll.1866.66.161> bilinear expansion.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Depends:

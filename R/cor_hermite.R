@@ -467,6 +467,292 @@ cor_hermite.data.frame <- function(x, poly_degree = 3L,
                      trim = trim, ...)
 }
 
+
+#' Distribution-Robust Partial and Semipartial Hermite Correlation
+#'
+#' Computes the distribution-robust partial or semipartial correlation between
+#' two variables controlling for one or more covariates, or computes the full
+#' partial correlation matrix for a multivariate dataset via precision matrix inversion.
+#'
+#' @param x A numeric vector (variable X), a numeric matrix, or a data frame.
+#' @param y A numeric vector (variable Y; required if \code{x} is a vector).
+#' @param z A numeric vector, matrix, or data frame of controlling covariates \eqn{\mathbf{Z}}.
+#' @param semi Logical; if \code{TRUE}, computes the semipartial (part) correlation
+#'   where \code{z} is partialled out of \code{y} only. Default is \code{FALSE} (partial correlation).
+#' @param copula Character string; \code{"none"} (default, copula-free cross-moments)
+#'   or \code{"gaussian"} (Mehler bilinear identity).
+#' @param poly_degree Integer; maximum polynomial degree (default \code{3L}).
+#' @param monotonicity Monotonicity constraint: \code{"relaxed"} (default), \code{"strict"}, or \code{"none"}.
+#' @param conf_level Numeric value in \eqn{(0, 1)} for confidence intervals, or \code{NULL} (default).
+#' @param ci_method Method for CI: \code{"fisher"} (analytical Fisher z) or \code{"bootstrap"}.
+#' @param B Integer; number of bootstrap replications (default \code{1000L}).
+#' @param ... Additional arguments passed to \code{\link{cor_hermite}}.
+#'
+#' @return
+#' If \code{x} is a matrix or data frame (and \code{y} is \code{NULL}), returns an
+#' object of class \code{"pcor_hermite_matrix"} containing:
+#' \describe{
+#'   \item{\code{pcor}}{The \eqn{p \times p} partial correlation matrix.}
+#'   \item{\code{r_Hermite}}{The \eqn{p \times p} pairwise Hermite correlation matrix.}
+#'   \item{\code{cov}}{The \eqn{p \times p} regularized covariance matrix.}
+#'   \item{\code{copula}}{The copula mode applied.}
+#'   \item{\code{n}}{Sample size.}
+#' }
+#'
+#' If \code{x}, \code{y}, and \code{z} are supplied, returns an object of class \code{"pcor_hermite"} containing:
+#' \describe{
+#'   \item{\code{estimate}}{The partial or semipartial correlation point estimate.}
+#'   \item{\code{rho_z_pcor}}{The latent copula partial correlation (if \code{copula = "gaussian"}).}
+#'   \item{\code{attenuation}}{The partial shape-attenuation factor (if \code{copula = "gaussian"}).}
+#'   \item{\code{semi}}{Logical; whether semipartial correlation was computed.}
+#'   \item{\code{copula}}{The copula mode applied.}
+#'   \item{\code{k_controls}}{Number of controlled covariates.}
+#'   \item{\code{n}}{Number of complete cases.}
+#'   \item{\code{ci}}{Confidence limits (if \code{conf_level} was specified).}
+#' }
+#'
+#' @examples
+#' # 1. Full Partial Correlation Matrix (iris dataset)
+#' data(iris)
+#' pcor_mat <- pcor_hermite(iris[, 1:4])
+#' print(pcor_mat)
+#'
+#' # 2. Specific Pair controlling for a Confounder
+#' set.seed(42)
+#' z <- rlnorm(60, meanlog = 1, sdlog = 0.5)
+#' x <- 0.6 * z + rnorm(60, sd = 2)
+#' y <- 0.7 * z + rnorm(60, sd = 2)
+#'
+#' fit_pcor <- pcor_hermite(x, y, z = z, conf_level = 0.95)
+#' print(fit_pcor)
+#'
+#' @export
+pcor_hermite <- function(x, y = NULL, z = NULL,
+                         semi = FALSE,
+                         copula = c("none", "gaussian"),
+                         poly_degree = 3L,
+                         monotonicity = c("relaxed", "strict", "none"),
+                         conf_level = NULL,
+                         ci_method = c("fisher", "bootstrap"),
+                         B = 1000L, ...) {
+
+  copula       <- match.arg(copula)
+  monotonicity <- match.arg(monotonicity)
+  ci_method    <- match.arg(ci_method)
+
+  # =========================================================================
+  # Case 1: Full Matrix / Data Frame Precision Inversion
+  # =========================================================================
+  if (is.matrix(x) || is.data.frame(x)) {
+    if (is.data.frame(x)) {
+      is_num <- vapply(x, is.numeric, logical(1L))
+      if (!all(is_num)) {
+        stop("All columns must be numeric. Non-numeric columns found: ",
+             paste(names(x)[!is_num], collapse = ", "))
+      }
+      mat <- as.matrix(x)
+    } else {
+      mat <- x
+    }
+
+    p <- ncol(mat)
+    if (is.null(p) || p < 3L) {
+      stop("Matrix or data frame must have at least 3 numeric columns for partial correlations.")
+    }
+
+    cnames <- colnames(mat)
+    if (is.null(cnames)) cnames <- paste0("V", seq_len(p))
+
+    # Compute full Hermite correlation matrix
+    fit_mat <- cor_hermite(mat, poly_degree = poly_degree, copula = copula,
+                           monotonicity = monotonicity, ...)
+    R <- fit_mat$r_Hermite
+
+    # Invert correlation matrix (with automatic ridge stabilization if ill-conditioned)
+    inv_R <- tryCatch(
+      solve(R),
+      error = function(e) {
+        solve(R + diag(1e-4, nrow = p, ncol = p))
+      }
+    )
+
+    # Standardize precision matrix to partial correlation matrix
+    diag_inv <- diag(inv_R)
+    P_mat <- -inv_R / sqrt(outer(diag_inv, diag_inv))
+    diag(P_mat) <- 1.0
+    dimnames(P_mat) <- list(cnames, cnames)
+
+    res <- list(
+      pcor   = P_mat,
+      r_Hermite   = R,
+      cov    = fit_mat$cov,
+      copula = copula,
+      n      = fit_mat$n
+    )
+    class(res) <- "pcor_hermite_matrix"
+    return(res)
+  }
+
+  # =========================================================================
+  # Case 2: Specific Pair (X, Y) Controlling for Z
+  # =========================================================================
+  if (is.null(y) || is.null(z)) {
+    stop("Arguments 'y' and 'z' must be supplied when 'x' is a numeric vector.")
+  }
+
+  if (!is.numeric(x) || !is.numeric(y)) {
+    stop("'x' and 'y' must be numeric vectors.")
+  }
+
+  Z_mat <- as.matrix(z)
+  if (!is.numeric(Z_mat)) stop("'z' must be numeric.")
+
+  if (length(x) != length(y) || length(x) != nrow(Z_mat)) {
+    stop("'x', 'y', and 'z' must have identical row dimensions.")
+  }
+
+  df_all <- data.frame(X = x, Y = y, Z_mat)
+  ok <- stats::complete.cases(df_all)
+  df_all <- df_all[ok, , drop = FALSE]
+  n <- nrow(df_all)
+  k <- ncol(Z_mat)
+
+  if (n < (k + 4L)) {
+    warning("Insufficient complete observations for partial correlation.")
+    return(structure(list(estimate = NA_real_, semi = semi, copula = copula,
+                          k_controls = k, n = n), class = "pcor_hermite"))
+  }
+
+  # Compute regularized covariance matrix for the combined system
+  fit_mat <- cor_hermite(df_all, poly_degree = poly_degree, copula = copula,
+                         monotonicity = monotonicity, ...)
+  Sigma <- fit_mat$cov
+
+  # Partition Covariance Matrix: Block 1 = (X, Y), Block 2 = Z
+  S11 <- Sigma[1:2, 1:2, drop = FALSE]
+  S12 <- Sigma[1:2, 3:(2 + k), drop = FALSE]
+  S21 <- Sigma[3:(2 + k), 1:2, drop = FALSE]
+  S22 <- Sigma[3:(2 + k), 3:(2 + k), drop = FALSE]
+
+  inv_S22 <- tryCatch(
+    solve(S22),
+    error = function(e) solve(S22 + diag(1e-4, nrow = k, ncol = k))
+  )
+  S_cond <- S11 - S12 %*% inv_S22 %*% S21
+
+  # Compute partial or semipartial correlation
+  if (semi) {
+    denom <- sqrt(S11[1, 1] * S_cond[2, 2])
+  } else {
+    denom <- sqrt(S_cond[1, 1] * S_cond[2, 2])
+  }
+
+  pcor_val <- if (is.na(denom) || denom <= 0) NA_real_ else max(-1.0, min(1.0, S_cond[1, 2] / denom))
+
+  # Latent Copula Partial Correlation (if copula = "gaussian")
+  rho_z_pcor <- NA_real_
+  att_val    <- NA_real_
+
+  if (copula == "gaussian" && !is.null(fit_mat$rho_z)) {
+    R_z <- fit_mat$rho_z
+    R11 <- R_z[1:2, 1:2, drop = FALSE]
+    R12 <- R_z[1:2, 3:(2 + k), drop = FALSE]
+    R21 <- R_z[3:(2 + k), 1:2, drop = FALSE]
+    R22 <- R_z[3:(2 + k), 3:(2 + k), drop = FALSE]
+
+    inv_R22 <- tryCatch(
+      solve(R22),
+      error = function(e) solve(R22 + diag(1e-4, nrow = k, ncol = k))
+    )
+    R_cond <- R11 - R12 %*% inv_R22 %*% R21
+    denom_z <- sqrt(R_cond[1, 1] * R_cond[2, 2])
+    rho_z_pcor <- if (is.na(denom_z) || denom_z <= 0) NA_real_ else max(-1.0, min(1.0, R_cond[1, 2] / denom_z))
+    att_val <- if (is.finite(rho_z_pcor) && abs(rho_z_pcor) > 1e-6) pcor_val / rho_z_pcor else 1.0
+  }
+
+  res <- list(
+    estimate     = pcor_val,
+    rho_z_pcor   = rho_z_pcor,
+    attenuation  = att_val,
+    semi         = semi,
+    copula       = copula,
+    k_controls   = k,
+    n            = n,
+    poly_degree  = poly_degree,
+    monotonicity = monotonicity,
+    data         = df_all
+  )
+  class(res) <- "pcor_hermite"
+
+  # Confidence Intervals
+  if (!is.null(conf_level) && is.finite(pcor_val)) {
+    if (ci_method == "fisher") {
+      z_val <- atanh(pcor_val)
+      se    <- 1 / sqrt(max(1, n - k - 3L))
+      crit  <- stats::qnorm((1 + conf_level) / 2)
+      res$ci <- tanh(z_val + c(-1, 1) * crit * se)
+    } else {
+      boot_vals <- numeric(B)
+      for (b in seq_len(B)) {
+        idx <- sample.int(n, n, replace = TRUE)
+        boot_vals[b] <- pcor_hermite(
+          x = df_all$X[idx], y = df_all$Y[idx], z = df_all[idx, 3:(2 + k), drop = FALSE],
+          semi = semi, copula = copula, poly_degree = poly_degree, monotonicity = monotonicity
+        )$estimate
+      }
+      alpha <- (1 - conf_level) / 2
+      res$ci <- stats::quantile(boot_vals, probs = c(alpha, 1 - alpha), na.rm = TRUE)
+    }
+    res$conf_level <- conf_level
+    res$ci_method  <- ci_method
+  }
+
+  res
+}
+
+# -----------------------------------------------------------------------------
+# S3 Print Methods for Partial Correlation
+# -----------------------------------------------------------------------------
+
+#' @export
+print.pcor_hermite <- function(x, digits = 3L, ...) {
+  type_lab <- if (x$semi) "Semipartial (Part)" else "Partial"
+  cop_lab  <- if (x$copula == "gaussian") "Gaussian Copula" else "Copula-Free"
+
+  cat(sprintf("\n  Distribution-Robust %s Correlation (r_Hermite)\n", type_lab))
+  cat(strrep("-", 54), "\n", sep = "")
+  cat(sprintf("  Estimate (r_Hermite.z)          :  %.*f\n", digits, x$estimate))
+  cat(sprintf("  Copula Mode                :  %s\n", cop_lab))
+  cat(sprintf("  Controlled Covariates (k)  :  %d\n", x$k_controls))
+  cat(sprintf("  Sample Size (n)            :  %d\n", x$n))
+
+  if (x$copula == "gaussian" && is.finite(x$rho_z_pcor)) {
+    cat(sprintf("  Latent Copula Partial r    :  %.*f\n", digits, x$rho_z_pcor))
+    cat(sprintf("  Shape Attenuation Factor   :  %.*f\n", digits, x$attenuation))
+  }
+
+  if (!is.null(x$ci)) {
+    cat(sprintf("  %s CI (%s): [%.*f, %.*f]\n",
+                paste0(round(x$conf_level * 100), "%"), x$ci_method,
+                digits, x$ci[1L], digits, x$ci[2L]))
+  }
+  cat("\n")
+  invisible(x)
+}
+
+#' @export
+print.pcor_hermite_matrix <- function(x, digits = 3L, ...) {
+  cop_lab <- if (x$copula == "gaussian") "Gaussian Copula" else "Copula-Free"
+
+  cat(sprintf("\n  Hermite Partial Correlation Matrix (r_Hermite.z; %s):\n", cop_lab))
+  cat(strrep("-", 56), "\n", sep = "")
+  print(round(x$pcor, digits = digits))
+  cat("\n")
+  invisible(x)
+}
+
+
+
 #' Convenience Alias for Gaussian-Copula Hermite-Mehler Correlation
 #' @rdname cor_hermite
 #' @export
@@ -587,7 +873,7 @@ cor_hermite_boot_ci <- function(object, x = NULL, y = NULL,
 #'
 #' @details
 #' When \code{method = "fisher"}, the interval is obtained by inverting the Fisher
-#' \eqn{z}-transformation on \eqn{r_{\mathrm{HM}}}. When \code{method = "bootstrap"},
+#' \eqn{z}-transformation on \eqn{r_{\mathrm{Hermite}}}. When \code{method = "bootstrap"},
 #' the function calls \code{\link{cor_hermite_boot_ci}}, refitting the model from scratch
 #' in each bootstrap replicate while inheriting the original polynomial degree and
 #' copula settings.
