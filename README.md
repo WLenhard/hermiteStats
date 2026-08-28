@@ -21,7 +21,7 @@ based on this, for fundamental statistics in quantitative research:
 2.  **The Distribution-Free Effect Size (d_reg):** a robust standardized
     mean difference for independent and paired samples that retains the
     metric and interpretation of Cohen’s *d* / Hedges’ *g*.
-3.  \*\*Non-parametric hypothesis tests (t_hermite, shape_hermite):
+3.  **Non-parametric hypothesis tests (t_hermite, shape_hermite):**
     robust hypotheses tests based on permutation and the fitted
     polynomials to test for mean (t_hermite) or shape differences
     (variance, skewness and kurtosis via shape_hermite), without relying

@@ -25,7 +25,7 @@ knitr::opts_chunk$set(
 
 1. **The Hermite Correlation (r_Hermite):** a distribution-robust estimator of the raw-scale Pearson correlation coefficient.
 2. **The Distribution-Free Effect Size (d_reg):** a robust standardized mean difference for independent and paired samples that retains the metric and interpretation of Cohen's *d* / Hedges' *g*.
-3. **Non-parametric hypothesis tests (t_hermite, shape_hermite): robust hypotheses tests based on permutation and the fitted polynomials to test for mean (t_hermite) or shape differences (variance, skewness and kurtosis via shape_hermite), without relying on distributional assumptions 
+3. **Non-parametric hypothesis tests (t_hermite, shape_hermite):** robust hypotheses tests based on permutation and the fitted polynomials to test for mean (t_hermite) or shape differences (variance, skewness and kurtosis via shape_hermite), without relying on distributional assumptions 
 
 The methods address a dilemma in robust statistics: classical solutions for non-normal data — trimming, Winsorizing, or converting to ranks — typically restore stability only by silently changing the quantity being estimated, discarding genuine tail variance in the process. `hermiteStats` instead models the empirical quantile function via regularized monotone polynomial smoothing and derives exact distributional moments in closed algebraic form using Probabilists' Hermite polynomials. It recovers the original, interpretable estimands of distributional moments, while gaining the stability of a robust method.
 
