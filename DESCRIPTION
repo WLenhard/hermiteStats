@@ -1,7 +1,7 @@
 Package: hermiteStats
 Type: Package
 Title: Distribution-Robust Statistics via Hermite Polynomial Quantile Modeling
-Version: 0.2.0
+Version: 0.3.0
 Authors@R: c(
     person("Wolfgang", "Lenhard", 
            email = "wolfgang.lenhard@uni-wuerzburg.de", 
@@ -25,7 +25,9 @@ Description: Provides distribution-robust estimation and statistical inference
     and Isserlis' (1918) <doi:10.1093/biomet/12.1-2.134> theorem. For bivariate
     data, the joint covariance is computed analytically either completely 
     without prior assumptions or under a latent Gaussian copula via Mehler's 
-    (1866) <doi:10.1515/crll.1866.66.161> Identity.
+    (1866) <doi:10.1515/crll.1866.66.161> Identity. Based on these approaches,
+    it includes distribution free hypothesis tests for mean and shape
+    differences.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Depends:

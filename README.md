@@ -21,6 +21,11 @@ based on this, for fundamental statistics in quantitative research:
 2.  **The Distribution-Free Effect Size (d_reg):** a robust standardized
     mean difference for independent and paired samples that retains the
     metric and interpretation of Cohen’s *d* / Hedges’ *g*.
+3.  \*\*Non-parametric hypothesis tests (t_hermite, shape_hermite):
+    robust hypotheses tests based on permutation and the fitted
+    polynomials to test for mean (t_hermite) or shape differences
+    (variance, skewness and kurtosis via shape_hermite), without relying
+    on distributional assumptions
 
 The methods address a dilemma in robust statistics: classical solutions
 for non-normal data — trimming, Winsorizing, or converting to ranks —
@@ -61,6 +66,8 @@ method.
     (d_reg)](#distribution-free-effect-sizes-d_reg)
   - [Paired and Repeated-Measures
     Designs](#paired-and-repeated-measures-designs)
+  - [Hypothesis testing for mean and shape
+    differences](#hypothesis-testing)
   - [Diagnostic Visualizations](#diagnostic-visualizations)
 - [Citation](#citation)
 - [References](#references)
@@ -565,6 +572,136 @@ the variability of the change scores themselves and will be larger
 whenever the paired Hermite correlation is strong (see [Mathematical
 Foundations §5](#5-distribution-free-effect-size-d_reg)).
 
+### Hypothesis Testing
+
+Beyond point and interval estimation, hermiteStats provides two
+complementary permutation-based hypothesis tests built on the same
+regularized quantile-fitting engine used throughout the package:
+`t_hermite()` for testing differences in central tendency
+(mean/location) between two independent or paired samples, and
+`shape_hermite()` for testing differences in distributional shape
+(variance, skewness, and kurtosis). Because both statistics are derived
+from an adaptively fitted, degree-selected polynomial quantile model,
+their exact sampling distribution under the null hypothesis has no
+closed form — both functions therefore obtain p-values by permutation,
+refitting the entire Hermite pipeline on every resampled data set so
+that the reference distribution reflects the same estimation variability
+as the observed statistic.
+
+#### `t_hermite()` — Testing Mean Differences
+
+`t_hermite()` is a distribution-robust alternative to Student’s/Welch’s
+t-test and the paired t-test. It converts the regularized effect size
+from `d_reg()` — the raw-scale dreg for independent groups, or the
+standardized mean change dz for paired designs — into a t-like
+statistic, and evaluates it against a permutation null (group-label
+reshuffling for independent samples; sign-flipping of paired differences
+for paired designs). This retains the familiar, interpretable Cohen’s-d
+/ paired-t metric while avoiding the inflated Type-I error and loss of
+power that raw Student’s t suffers under skewed or heavy-tailed data.
+
+``` r
+set.seed(42)
+ctrl <- rlnorm(30, meanlog = 2.0, sdlog = 0.5)
+trt  <- rlnorm(30, meanlog = 2.3, sdlog = 0.5)
+
+# Independent groups
+test_indep <- t_hermite(ctrl, trt, nperm = 2000)
+print(test_indep)
+#> 
+#>   Two-Sample Hermite Permutation Test
+#> ----------------------------------------------------
+#>   t_Hermite Statistic        :  1.040
+#>   Effect Size (d_reg)          :  0.269
+#>   Mean Difference            :  1.367
+#>   Sample Sizes               :  n1 = 30, n2 = 30
+#>   Alternative Hypothesis     :  two.sided
+#>   Permutations (successful)  :  2000 / 2000 (100.0%)
+#>   p-value (Monte Carlo perm.):  0.312
+
+# Paired / repeated-measures design
+pre  <- rlnorm(25, meanlog = 3.0, sdlog = 0.4)
+post <- pre + rnorm(25, mean = 4.0, sd = 1.5)
+test_paired <- t_hermite(pre, post, paired = TRUE, nperm = 2000)
+print(test_paired)
+#> 
+#>   Paired Hermite Permutation Test
+#> ----------------------------------------------------
+#>   t_Hermite Statistic        :  14.643
+#>   Effect Size (d_z)          :  2.929
+#>   Mean Difference            :  4.081
+#>   Sample Sizes               :  n1 = 25, n2 = 25
+#>   Alternative Hypothesis     :  two.sided
+#>   Permutations (successful)  :  2000 / 2000 (100.0%)
+#>   p-value (Monte Carlo perm.):  0.000
+```
+
+#### `shape_hermite()` — Testing Shape Differences (Variance, Skewness, Kurtosis)
+
+While `t_hermite()` focuses on location, `shape_hermite()` tests whether
+two groups differ in distributional shape, using the closed-form Hermite
+moments from `hermite_moments()`. Both groups are refit at a shared,
+matched polynomial degree to ensure their moments are directly
+comparable, and p-values — per moment, Holm-adjusted, plus an optional
+omnibus test combining all three — are again obtained by permutation.
+This makes it possible to detect and interpret distributional changes —
+e.g. a treatment that increases variance or skewness without shifting
+the mean — that a location-only test would miss entirely.
+
+``` r
+# Independent groups: matched mean/SD but different skewness
+set.seed(1)
+g1 <- rnorm(60)
+g2 <- as.numeric(scale(rgamma(60, shape = 2)))
+
+shape_test <- shape_hermite(g1, g2, nperm = 2000)
+print(shape_test)
+#> 
+#>   Two-Sample Hermite Shape-Difference Permutation Test
+#> ----------------------------------------------------------
+#>   Sample Sizes              :  n1 = 60, n2 = 60
+#>   Matched Polynomial Degree :  3 (requested: 3)
+#>   Permutations (successful) :  2000 / 2000 (100.0%)
+#> 
+#>   Shape-Difference Profile (Group 2 - Group 1):
+#>           Moment Difference p_value p_holm
+#>         variance      0.269   0.322  0.644
+#>         skewness      1.530   0.003  0.009
+#>  excess_kurtosis      0.720   0.752  0.752
+#> 
+#>   Omnibus Shape Test (sum of squared standardized differences):
+#>     Statistic = 7.678,  p-value = 0.038
+
+# Paired design: heavier-tailed change scores
+pre  <- rnorm(40)
+post <- pre + rt(40, df = 3) * 0.3
+shape_test_paired <- shape_hermite(pre, post, paired = TRUE, nperm = 2000)
+print(shape_test_paired)
+#> 
+#>   Paired Hermite Shape-Difference Permutation Test
+#> ----------------------------------------------------------
+#>   Sample Sizes              :  n1 = 40, n2 = 40
+#>   Matched Polynomial Degree :  3 (requested: 3)
+#>   Permutations (successful) :  2000 / 2000 (100.0%)
+#> 
+#>   Shape-Difference Profile (Group 2 - Group 1):
+#>           Moment Difference p_value p_holm
+#>         variance      0.136   0.298  0.895
+#>         skewness     -0.059   0.749  1.000
+#>  excess_kurtosis      0.181   0.699  1.000
+#> 
+#>   Omnibus Shape Test (sum of squared standardized differences):
+#>     Statistic = 1.414,  p-value = 0.672
+```
+
+Together, `t_hermite()` and `shape_hermite()` support a full “mean and
+shape” comparison between two groups or conditions, each using a
+resampling scheme matched to its own null hypothesis. Note that both
+functions refit the complete Hermite estimation pipeline on every
+permutation replicate, so runtime scales with the number of
+permutations. For exploratory use, a few hundred permutations are
+usually enough, while final reported results should use nperm ≥ 2000.
+
 ### Diagnostic Visualizations
 
 Every model object has a `plot()` method, so the regularization step is
@@ -578,7 +715,7 @@ moments:
 plot(fit)
 ```
 
-<img src="man/figures/README-unnamed-chunk-13-1.png" alt="" width="100%" />
+<img src="man/figures/README-unnamed-chunk-15-1.png" alt="" width="100%" />
 
 A `cor_hermite` fit shows the latent copula on the left, and the
 manifest association on the right — with both the model-implied
@@ -591,7 +728,7 @@ assumption:
 plot(fit_cor)
 ```
 
-<img src="man/figures/README-unnamed-chunk-14-1.png" alt="" width="100%" />
+<img src="man/figures/README-unnamed-chunk-16-1.png" alt="" width="100%" />
 
 A `d_reg` fit shows both groups’ empirical densities (with regularized
 means and the effect size annotated) alongside their regularized
@@ -601,7 +738,7 @@ quantile maps overlaid on a single panel:
 plot(fit_d)
 ```
 
-<img src="man/figures/README-unnamed-chunk-15-1.png" alt="" width="100%" />
+<img src="man/figures/README-unnamed-chunk-17-1.png" alt="" width="100%" />
 
 ## Citation
 
