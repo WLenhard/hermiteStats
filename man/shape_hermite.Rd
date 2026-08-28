@@ -2,9 +2,26 @@
 % Please edit documentation in R/tests.R
 \name{shape_hermite}
 \alias{shape_hermite}
+\alias{shape_hermite.formula}
+\alias{shape_hermite.default}
 \title{Distribution-Robust Permutation Test for Shape Differences (Variance, Skewness, Kurtosis)}
 \usage{
-shape_hermite(
+shape_hermite(x, ...)
+
+\method{shape_hermite}{formula}(
+  formula,
+  data = NULL,
+  paired = FALSE,
+  degree = 3L,
+  monotonicity = c("relaxed", "strict", "none"),
+  ties_method = c("average", "random"),
+  nperm = 2000L,
+  min_success = 0.9,
+  omnibus = TRUE,
+  ...
+)
+
+\method{shape_hermite}{default}(
   x,
   y,
   paired = FALSE,
@@ -13,144 +30,63 @@ shape_hermite(
   ties_method = c("average", "random"),
   nperm = 2000L,
   min_success = 0.9,
-  omnibus = TRUE
+  omnibus = TRUE,
+  ...
 )
 }
 \arguments{
-\item{x}{A numeric vector of observations for the first group (or the
-pre-measurement / baseline in a paired design).}
+\item{x}{A numeric vector of observations, or a two-sided \code{\link[stats]{formula}} of the form \code{response ~ group}.}
 
-\item{y}{A numeric vector of observations for the second group (or the
-post-measurement in a paired design).}
+\item{...}{Additional arguments passed to methods.}
 
-\item{paired}{Logical; \code{TRUE} for a paired-samples (within-subjects,
-pre-post) design. Default \code{FALSE}.}
+\item{formula}{A two-sided \code{\link[stats]{formula}} of the form \code{response ~ group}.}
 
-\item{degree}{Integer scalar; maximum polynomial degree requested for the
-marginal quantile fits (default \code{3L}). Both groups are refit, if
-necessary, at a common \emph{realized} degree so that their moments are
-directly comparable; see Details.}
+\item{data}{An optional data frame containing variables in \code{formula}.}
 
-\item{monotonicity}{Monotonicity constraint passed to \code{\link{hermite_fit}}:
-\code{"relaxed"} (default), \code{"strict"}, or \code{"none"}.}
+\item{paired}{Logical; \code{TRUE} for a paired-samples design. Default is \code{FALSE}.}
 
-\item{ties_method}{Rank tie-handling method passed to \code{\link{hermite_fit}}:
-\code{"average"} (default) or \code{"random"}.}
+\item{degree}{Integer scalar; maximum polynomial degree requested (default \code{3L}).}
 
-\item{nperm}{Integer; number of permutation resamples (default \code{2000L}).
-Resamples are drawn randomly rather than enumerated exhaustively, so the
-resulting \eqn{p}-values are Monte Carlo approximations.}
+\item{monotonicity}{Monotonicity constraint: \code{"relaxed"} (default), \code{"strict"}, or \code{"none"}.}
 
-\item{min_success}{Minimum acceptable proportion of successfully fitted
-permutation replicates before a warning is issued (default \code{0.90}).}
+\item{ties_method}{Rank tie-handling method: \code{"average"} (default) or \code{"random"}.}
 
-\item{omnibus}{Logical; if \code{TRUE} (default), additionally computes a
-permutation-based omnibus test combining all three shape moments into a
-single global test statistic (see Details).}
+\item{nperm}{Integer; number of permutation resamples (default \code{2000L}).}
+
+\item{min_success}{Minimum proportion of successful permutation replicates required (default \code{0.90}).}
+
+\item{omnibus}{Logical; if \code{TRUE} (default), computes an omnibus sum-of-squares shape test.}
+
+\item{y}{A numeric vector of observations for the second group.}
 }
 \value{
-An S3 object of class \code{"shape_hermite"} containing:
-\describe{
-  \item{\code{estimate}}{Named numeric vector of observed shape differences
-    (Group 2 \eqn{-} Group 1): \code{variance}, \code{skewness}, \code{excess_kurtosis}.}
-  \item{\code{p_value}}{Named vector of raw (unadjusted) permutation \eqn{p}-values per moment.}
-  \item{\code{p_adjusted}}{Holm-adjusted \eqn{p}-values across the three moments.}
-  \item{\code{omnibus}}{A list with \code{statistic} and \code{p_value} for the
-    global shape test (\code{NULL} if \code{omnibus = FALSE}).}
-  \item{\code{n1}, \code{n2}}{Group sample sizes.}
-  \item{\code{degree_matched}, \code{degree_requested}}{The common realized
-    polynomial degree used for both groups, and the originally requested maximum.}
-  \item{\code{paired}, \code{nperm}}{Settings used.}
-  \item{\code{n_perm_success}, \code{success_rate}}{Number/proportion of
-    permutation replicates that fitted successfully.}
-  \item{\code{perm_distribution}}{The \code{n_perm_success x 3} matrix of
-    successful permutation moment differences.}
-  \item{\code{fit1}, \code{fit2}}{The observed, degree-matched \code{\link{hermite_fit}} objects.}
-  \item{\code{method}}{Character label describing the test.}
-}
+An S3 object of class \code{"shape_hermite"}.
 }
 \description{
-Tests for differences in the regularized distributional \emph{shape}
-(variance, skewness, excess kurtosis) between two independent groups or two
-paired measurements, using the closed-form Hermite moments from
-\code{\link{hermite_moments}} as the target quantities and a permutation
-null distribution for inference. This is the shape-focused counterpart to
-\code{\link{t_hermite}}, which tests location (mean) differences only.
-}
-\details{
-\subsection{Matched polynomial degree}{
-Because variance, skewness, and excess kurtosis are algebraic functions of
-the fitted polynomial's coefficients (see \code{\link{hermite_fit}}), a
-difference in \emph{realized} degree between the two groups' independently
-adaptive fits would confound genuine shape differences with differences in
-model flexibility. Before extracting moments, both groups are therefore
-iteratively refit at a shared common degree: starting from \code{degree},
-both groups are fit, and if either one required a lower degree to satisfy
-the monotonicity constraint, the common cap is reduced to the lower of the
-two realized degrees and both groups are refit; this repeats until the
-realized degree is stable for both groups.
-}
-\subsection{Resampling scheme}{
-On every replicate, the matched-degree fitting procedure above is rerun on
-resampled data, so the permutation null reflects the same degree-selection
-variability as the observed test.
-\describe{
-  \item{Independent groups}{The pooled sample is randomly re-split into
-    groups of size \eqn{n_1} and \eqn{n_2} without replacement.}
-  \item{Paired design}{For each pair \eqn{(x_i, y_i)}, the two values are
-    swapped with probability 0.5. Unlike the sign-flip scheme used by
-    \code{\link{t_hermite}} for testing the paired \emph{difference} series
-    (which never needs to re-randomize either marginal's identity), testing
-    genuine \emph{marginal} shape equality requires actually re-randomizing
-    which member of each pair is labeled "group 1" vs. "group 2" under the
-    null hypothesis of within-pair exchangeability.}
-}
-}
-\subsection{Omnibus test}{
-If \code{omnibus = TRUE}, the three observed moment differences are
-standardized using the mean and standard deviation of their own permutation
-distributions, and combined as a sum of squares
-(\eqn{\sum_k z_k^2}, \eqn{k \in \{\text{variance, skewness, kurtosis}\}}),
-analogous to O'Brien's (1984) global test for multiple endpoints. Its
-permutation \eqn{p}-value is obtained by recomputing the same standardized
-sum-of-squares statistic on every permutation replicate, which implicitly
-captures the joint null covariance of the three moment estimators without
-requiring it to be derived analytically.
-}
-\subsection{Scope}{
-This function intentionally does not test the mean/location. Use
-\code{\link{t_hermite}} for location inference; combining both functions
-yields a full "mean and shape" comparison, each with a test scheme matched
-to its own null hypothesis.
-}
+Tests for differences in the regularized distributional shape
+(variance, skewness, excess kurtosis) between two independent groups or paired measurements,
+using closed-form Hermite moments and an exact permutation null distribution.
 }
 \examples{
-# 1. Independent groups differing in skewness but not in mean/variance
+# 1. Independent groups
 set.seed(1)
-g1 <- rnorm(60)
-g2 <- as.numeric(scale(rgamma(60, shape = 2))) # right-skewed, same mean/sd after scaling
-test1 <- shape_hermite(g1, g2, nperm = 500)
-print(test1)
+g1 <- rnorm(40)
+g2 <- rgamma(40, shape = 2)
+sres <- shape_hermite(g1, g2, nperm = 500)
+print(sres)
+plot(sres)
 
-# 2. Paired design
-set.seed(2)
-pre  <- rnorm(40)
-post <- pre + rt(40, df = 3) * 0.3   # heavier-tailed change
-test2 <- shape_hermite(pre, post, paired = TRUE, nperm = 500)
-print(test2)
+# 2. Formula interface
+df_shape <- data.frame(val = c(g1, g2), grp = factor(rep(c("A", "B"), each = 40)))
+sres_form <- shape_hermite(val ~ grp, data = df_shape, nperm = 500)
+print(sres_form)
 
 }
 \references{
-Anderson, M. J., & ter Braak, C. J. F. (2003). Permutation tests for multi-factorial analysis of variance. \emph{Journal of Statistical Computation and Simulation}, 73(2), 85-113. \doi{10.1080/00949650215733}
-
-Edgington, E. S., & Onghena, P. (2007). \emph{Randomization Tests} (4th ed.). Chapman & Hall/CRC.
-
-O'Brien, P. C. (1984). Procedures for comparing samples with multiple endpoints. \emph{Biometrics}, 40(4), 1079-1087. \doi{10.2307/2531158}
-
-Lenhard, W., & Lenhard, A. (submitted). Distribution-Free Effect Size Estimation: A Robust Alternative to Cohen's d and other effect size estimators. \emph{Behavior Research Methods}.
+O'Brien, P. C. (1984). Procedures for comparing samples with multiple endpoints. \emph{Biometrics}, 40(4), 1079–1087. \doi{10.2307/2531158}
 }
 \seealso{
-\code{\link{t_hermite}}, \code{\link{d_reg}}, \code{\link{hermite_fit}}, \code{\link{hermite_moments}}
+\code{\link{t_hermite}}, \code{\link{hermite_moments}}
 }
 \author{
 Wolfgang Lenhard, Alexandra Lenhard

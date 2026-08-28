@@ -1,7 +1,7 @@
 Package: hermiteStats
 Type: Package
 Title: Distribution-Robust Statistics via Hermite Polynomial Quantile Modeling
-Version: 0.3.0
+Version: 0.3.5
 Authors@R: c(
     person("Wolfgang", "Lenhard", 
            email = "wolfgang.lenhard@uni-wuerzburg.de", 

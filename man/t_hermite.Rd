@@ -2,9 +2,27 @@
 % Please edit documentation in R/tests.R
 \name{t_hermite}
 \alias{t_hermite}
+\alias{t_hermite.formula}
+\alias{t_hermite.default}
 \title{Distribution-Robust Permutation Test for Mean Differences (Hermite t-Test)}
 \usage{
-t_hermite(
+t_hermite(x, ...)
+
+\method{t_hermite}{formula}(
+  formula,
+  data = NULL,
+  paired = FALSE,
+  degree = 3L,
+  copula = c("none", "gaussian"),
+  monotonicity = c("relaxed", "strict", "none"),
+  type = c("regularized", "hedges", "glass", "combined"),
+  alternative = c("two.sided", "greater", "less"),
+  nperm = 2000L,
+  min_success = 0.9,
+  ...
+)
+
+\method{t_hermite}{default}(
   x,
   y,
   paired = FALSE,
@@ -19,144 +37,75 @@ t_hermite(
 )
 }
 \arguments{
-\item{x}{A numeric vector of observations for the first group (or the
-pre-measurement / baseline in a paired design).}
+\item{x}{A numeric vector of observations for the first group (or baseline in a paired design),
+or a two-sided \code{\link[stats]{formula}} of the form \code{response ~ group}.}
 
-\item{y}{A numeric vector of observations for the second group (or the
-post-measurement in a paired design).}
+\item{...}{Additional arguments passed to methods.}
 
-\item{paired}{Logical; \code{TRUE} for a paired-samples (within-subjects,
-pre-post) design. Default \code{FALSE}.}
+\item{formula}{A two-sided \code{\link[stats]{formula}} of the form \code{response ~ group}.}
 
-\item{degree}{Integer scalar; maximum polynomial degree used for the
-marginal quantile fits, passed to \code{\link{d_reg}} (default \code{3L}).}
+\item{data}{An optional data frame, list, or environment containing variables in \code{formula}.}
 
-\item{copula}{Character string; copula mode for the paired Hermite
-correlation reported by \code{\link{d_reg}} when \code{paired = TRUE}:
-\code{"none"} (default) or \code{"gaussian"}. Ignored for independent groups.}
+\item{paired}{Logical; \code{TRUE} for a paired-samples design. Default is \code{FALSE}.}
 
-\item{monotonicity}{Monotonicity constraint passed to \code{\link{hermite_fit}}:
-\code{"relaxed"} (default), \code{"strict"}, or \code{"none"}.}
+\item{degree}{Integer scalar; maximum polynomial degree used for quantile fits (default \code{3L}).}
 
-\item{type}{Effect-size variant used as the test statistic, passed to
-\code{\link{d_reg}}: \code{"regularized"} (default; \eqn{d_{\mathrm{reg}}}
-for independent groups, \eqn{d_z} for paired designs), \code{"hedges"},
-\code{"glass"}, or \code{"combined"}. See \code{\link{d_reg}} for details.}
+\item{copula}{Character string; copula mode for paired designs (\code{"none"} or \code{"gaussian"}).}
 
-\item{alternative}{Character string specifying the alternative hypothesis,
-in the direction of \eqn{\mathrm{mean}(y) - \mathrm{mean}(x)}:
-\code{"two.sided"} (default), \code{"greater"}, or \code{"less"}.}
+\item{monotonicity}{Monotonicity constraint: \code{"relaxed"} (default), \code{"strict"}, or \code{"none"}.}
 
-\item{nperm}{Integer; number of permutation resamples (default \code{2000L}).
-Resamples are drawn randomly rather than enumerated exhaustively, so the
-resulting \eqn{p}-value is a Monte Carlo approximation to the exact
-permutation \eqn{p}-value; increase \code{nperm} for greater precision.}
+\item{type}{Effect-size variant: \code{"regularized"} (default), \code{"hedges"}, \code{"glass"}, or \code{"combined"}.}
 
-\item{min_success}{Minimum acceptable proportion of successfully fitted
-permutation replicates before a warning is issued (default \code{0.90}).
-Occasional failures (e.g. a degenerate resample) are excluded from the
-reference distribution rather than aborting the test.}
+\item{alternative}{Character string specifying the alternative hypothesis: \code{"two.sided"} (default), \code{"greater"}, or \code{"less"}.}
 
-\item{...}{Additional arguments passed to \code{\link{d_reg}} \strong{for the
-observed statistic only} (e.g. \code{conf_level} to additionally attach a
-confidence interval for the effect size). These arguments are deliberately
-\emph{not} forwarded to the internal permutation replicates, to avoid
-triggering redundant nested bootstrap/CI computations on every resample.}
+\item{nperm}{Integer; number of permutation resamples (default \code{2000L}).}
+
+\item{min_success}{Minimum proportion of successful permutation replicates required (default \code{0.90}).}
+
+\item{y}{A numeric vector of observations for the second group (or post-measurement in paired designs).}
 }
 \value{
-An S3 object of class \code{"t_hermite"} containing:
-\describe{
-  \item{\code{statistic}}{The observed Hermite \eqn{t}-like statistic.}
-  \item{\code{p_value}}{The Monte Carlo permutation \eqn{p}-value.}
-  \item{\code{estimate}}{The underlying \code{\link{d_reg}} point estimate
-    (\eqn{d_{\mathrm{reg}}} or \eqn{d_z}, depending on \code{paired}/\code{type}).}
-  \item{\code{d_reg}, \code{d_z}}{Raw-scale and (if paired) standardized
-    mean-change effect sizes from \code{\link{d_reg}}.}
-  \item{\code{mean_diff}}{Regularized mean difference (\eqn{\hat\mu_2 - \hat\mu_1}).}
-  \item{\code{n1}, \code{n2}}{Group sample sizes.}
-  \item{\code{paired}, \code{alternative}, \code{nperm}}{Settings used.}
-  \item{\code{n_perm_success}, \code{success_rate}}{Number and proportion of
-    permutation replicates that fitted successfully.}
-  \item{\code{perm_distribution}}{The vector of successful permutation statistics.}
-  \item{\code{d_reg_fit}}{The observed \code{\link{d_reg}} object underlying the test.}
-  \item{\code{method}}{Character label describing the test.}
-}
+An S3 object of class \code{"t_hermite"}.
 }
 \description{
 Computes a permutation test for the difference in means between two
-independent groups, or between two paired (repeated) measurements, using
-the distribution-robust, polynomial-quantile-regularized effect size
-(\eqn{d_{\mathrm{reg}}} or \eqn{d_z}) from \code{\link{d_reg}} as the test
-statistic, in place of the classical sample mean and standard deviation
-used by Student's or Welch's \eqn{t}-test.
-}
-\details{
-\subsection{Test statistic}{
-The observed statistic converts the regularized effect size from
-\code{\link{d_reg}} to a \eqn{t}-like quantity using the classical
-relationship between Cohen's \eqn{d}/\eqn{d_z} and Student's \eqn{t}:
-\deqn{t_{\mathrm{Hermite}} = \hat d \times \sqrt{\tilde n}, \qquad
-      \tilde n = \begin{cases} n_1 & \text{(paired)} \\
-                                n_1 n_2 / (n_1 + n_2) & \text{(independent)}
-                 \end{cases}}
-Because \eqn{\hat d} is derived from an adaptively fitted, degree-selected
-polynomial quantile model, its exact finite-sample null distribution is not
-analytically tractable, so \eqn{p}-values are obtained by permutation
-instead of the classical (asymptotic) \eqn{t} reference distribution. Note
-that multiplying by the constant \eqn{\sqrt{\tilde n}} does not change the
-resulting \eqn{p}-value (it is the same positive scalar for the observed
-statistic and every permutation replicate) — it is included purely to
-report a familiar \eqn{t}-like magnitude.
-}
-\subsection{Resampling scheme}{
-On every replicate, the \emph{entire} \code{\link{d_reg}} pipeline (rank-based
-NQT, adaptive polynomial degree selection, monotonicity checking) is refit
-from scratch, so that the permutation null distribution reflects the same
-estimation variability as the observed statistic (Edgington & Onghena, 2007).
-\describe{
-  \item{Independent groups}{The pooled sample \eqn{(x, y)} is randomly
-    re-split into groups of size \eqn{n_1} and \eqn{n_2} without
-    replacement, consistent with the null hypothesis of exchangeable group
-    labels.}
-  \item{Paired design}{For each pair, the observed difference
-    \eqn{D_i = y_i - x_i} has its sign flipped with probability 0.5
-    (Rademacher / sign-flip resampling), and a pseudo-pair
-    \eqn{(x_i,\; x_i + s_i D_i)} is reconstructed. This preserves \eqn{x_i}'s
-    actual marginal distribution and calls \code{\link{d_reg}} in exactly
-    the same configuration as the observed analysis, while randomizing the
-    direction of the paired difference under the null hypothesis of a
-    symmetric, zero-centered change distribution (Anderson & ter Braak, 2003).}
-}
-}
+independent groups or paired (repeated) measurements, using the distribution-robust
+polynomial-quantile-regularized effect size (\eqn{d_{\mathrm{reg}}} or \eqn{d_z})
+from \code{\link{d_reg}} as the test statistic.
 }
 \examples{
-# 1. Independent groups, skewed data
+# 1. Independent groups (vectors)
 set.seed(42)
 ctrl <- rlnorm(25, meanlog = 2.0, sdlog = 0.5)
 trt  <- rlnorm(25, meanlog = 2.3, sdlog = 0.5)
 test1 <- t_hermite(ctrl, trt, nperm = 500)
 print(test1)
+plot(test1)
 
-# 2. Paired / repeated-measures design
+# 2. Formula interface
+df_test <- data.frame(
+  score = c(ctrl, trt),
+  group = factor(rep(c("Ctrl", "Trt"), each = 25))
+)
+test_form <- t_hermite(score ~ group, data = df_test, nperm = 500)
+print(test_form)
+
+# 3. Paired / repeated-measures design
 pre  <- rlnorm(20, meanlog = 3.0, sdlog = 0.4)
 post <- pre + rnorm(20, mean = 3.0, sd = 1.5)
-test2 <- t_hermite(pre, post, paired = TRUE, nperm = 500)
-print(test2)
-
-# 3. One-sided alternative
-test3 <- t_hermite(ctrl, trt, alternative = "less", nperm = 500)
-print(test3)
+test_paired <- t_hermite(pre, post, paired = TRUE, nperm = 500)
+print(test_paired)
 
 }
 \references{
-Anderson, M. J., & ter Braak, C. J. F. (2003). Permutation tests for multi-factorial analysis of variance. \emph{Journal of Statistical Computation and Simulation}, 73(2), 85-113. \doi{10.1080/00949650215733}
+Anderson, M. J., & ter Braak, C. J. F. (2003). Permutation tests for multi-factorial analysis of variance. \emph{Journal of Statistical Computation and Simulation}, 73(2), 85–113. \doi{10.1080/00949650215733}
 
 Edgington, E. S., & Onghena, P. (2007). \emph{Randomization Tests} (4th ed.). Chapman & Hall/CRC.
 
-Lenhard, W., & Lenhard, A. (submitted). Distribution-Free Effect Size Estimation: A Robust Alternative to Cohen's d and other effect size estimators. \emph{Behavior Research Methods}.
+Phipson, B., & Smyth, G. K. (2010). Permutation P-values should never be zero: calculating exact P-values when permutations are randomly drawn. \emph{Statistical Applications in Genetics and Molecular Biology}, 9(1), Article 39. \doi{10.2202/1544-6115.1585}
 }
 \seealso{
-\code{\link{d_reg}}, \code{\link{hermite_fit}}, \code{\link{cor_hermite}}
+\code{\link{d_reg}}, \code{\link{shape_hermite}}, \code{\link{hermite_fit}}
 }
 \author{
 Wolfgang Lenhard, Alexandra Lenhard

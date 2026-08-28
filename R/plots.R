@@ -340,3 +340,128 @@ plot.d_reg <- function(x, ...) {
 
   invisible(x)
 }
+
+# -----------------------------------------------------------------------------
+# plot.t_hermite
+# -----------------------------------------------------------------------------
+
+#' Plot a Hermite t-Test Object
+#'
+#' Displays the permutation null distribution of the Hermite \eqn{t}-statistic,
+#' marking the observed test statistic with a solid vertical line, two-sided
+#' critical boundaries with dashed lines, and annotating the \eqn{p}-value.
+#'
+#' @param x An object of class \code{"t_hermite"}.
+#' @param ... Additional graphical parameters passed to \code{\link[graphics]{plot}}.
+#'
+#' @return The object \code{x}, invisibly.
+#'
+#' @examples
+#' set.seed(42)
+#' ctrl <- rlnorm(25, 2.0, 0.5)
+#' trt  <- rlnorm(25, 2.3, 0.5)
+#' res <- t_hermite(ctrl, trt, nperm = 500)
+#' plot(res)
+#'
+#' @export
+plot.t_hermite <- function(x, ...) {
+  if (is.null(x$perm_distribution) || length(x$perm_distribution) == 0L) {
+    stop("No permutation distribution available to plot.")
+  }
+
+  oldpar <- graphics::par(no.readonly = TRUE)
+  on.exit(graphics::par(oldpar))
+  graphics::par(mar = c(4.2, 4.2, 3.4, 1.2), font.main = 1)
+
+  d <- stats::density(x$perm_distribution)
+  xlim_vals <- range(d$x, x$statistic, -x$statistic)
+  xlim <- xlim_vals + c(-1, 1) * 0.1 * diff(xlim_vals)
+
+  plot(d, main = paste0("Permutation Null Distribution (", x$method, ")"),
+       xlab = "t_Hermite (under H0)", bty = "l", col = "darkblue", lwd = 2,
+       xlim = xlim, panel.first = graphics::grid(col = "gray90", lty = 1), ...)
+
+  graphics::polygon(d, col = grDevices::adjustcolor("steelblue", alpha.f = 0.2), border = NA)
+  graphics::abline(v = x$statistic, col = "firebrick", lwd = 2.5, lty = 1)
+
+  if (x$alternative == "two.sided") {
+    graphics::abline(v = -x$statistic, col = "firebrick", lwd = 1.5, lty = 2)
+  }
+
+  graphics::mtext(sprintf("Observed t = %.3f  |  p = %.3f (%s)",
+                          x$statistic, x$p_value, x$alternative),
+                  side = 3, line = 0.3, cex = 0.85, col = "gray20")
+
+  graphics::legend("topright",
+                   legend = c("Permutation Null", sprintf("Observed t = %.3f", x$statistic)),
+                   col = c("darkblue", "firebrick"), lwd = c(2, 2.5), lty = c(1, 1),
+                   bty = "n", cex = 0.85)
+
+  invisible(x)
+}
+
+# -----------------------------------------------------------------------------
+# plot.shape_hermite
+# -----------------------------------------------------------------------------
+
+#' Plot a Hermite Shape-Difference Test Object
+#'
+#' Displays a 3-panel visualization showing the permutation null distributions
+#' for \strong{Variance}, \strong{Skewness}, and \strong{Excess Kurtosis} differences,
+#' marking observed differences and annotating raw and Holm-adjusted \eqn{p}-values.
+#'
+#' @param x An object of class \code{"shape_hermite"}.
+#' @param ... Additional graphical parameters.
+#'
+#' @return The object \code{x}, invisibly.
+#'
+#' @examples
+#' set.seed(42)
+#' g1 <- rnorm(40)
+#' g2 <- rgamma(40, shape = 2)
+#' sres <- shape_hermite(g1, g2, nperm = 500)
+#' plot(sres)
+#'
+#' @export
+plot.shape_hermite <- function(x, ...) {
+  if (is.null(x$perm_distribution) || nrow(x$perm_distribution) == 0L) {
+    stop("No permutation distribution available to plot.")
+  }
+
+  oldpar <- graphics::par(no.readonly = TRUE)
+  on.exit(graphics::par(oldpar))
+  graphics::par(mfrow = c(1, 3), mar = c(4.2, 4.0, 3.4, 1.0), font.main = 1)
+
+  moment_titles <- c(variance        = "Variance Difference",
+                     skewness        = "Skewness Difference",
+                     excess_kurtosis = "Excess Kurtosis Difference")
+
+  pal_col <- c("#1b9e77", "#d95f02", "#7570b3")
+
+  for (i in seq_along(moment_titles)) {
+    m_name   <- names(moment_titles)[i]
+    perm_vals <- x$perm_distribution[, m_name]
+    obs_val  <- x$estimate[m_name]
+    p_val    <- x$p_value[m_name]
+    p_adj    <- x$p_adjusted[m_name]
+
+    d <- stats::density(perm_vals)
+    xlim_vals <- range(d$x, obs_val, -obs_val)
+    xlim <- xlim_vals + c(-1, 1) * 0.1 * diff(xlim_vals)
+
+    plot(d, main = moment_titles[m_name],
+         xlab = paste0("Delta ", m_name, " (under H0)"),
+         ylab = if (i == 1L) "Density" else "",
+         bty = "l", col = pal_col[i], lwd = 2, xlim = xlim,
+         panel.first = graphics::grid(col = "gray90", lty = 1), ...)
+
+    graphics::polygon(d, col = grDevices::adjustcolor(pal_col[i], alpha.f = 0.2), border = NA)
+    graphics::abline(v = obs_val, col = "firebrick", lwd = 2.5, lty = 1)
+    graphics::abline(v = -obs_val, col = "firebrick", lwd = 1.2, lty = 2)
+
+    graphics::mtext(sprintf("Diff = %.3f | p = %.3f (adj: %.3f)", obs_val, p_val, p_adj),
+                    side = 3, line = 0.3, cex = 0.8, col = "gray20")
+  }
+
+  invisible(x)
+}
