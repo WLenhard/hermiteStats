@@ -1,3 +1,7 @@
+# =============================================================================
+# d_reg.R -- Distribution-Free Effect Size Estimation
+# =============================================================================
+
 #' @title Distribution-Free Effect Size Estimation (d_reg)
 #'
 #' @description
@@ -8,19 +12,25 @@
 #' non-normal continuous distributions by replacing raw sample means/variances
 #' with regularized polynomial quantile models and closed-form Hermite moments.
 #'
+#' \code{d_reg()} is the package's \emph{estimation} tool for mean differences;
+#' its permutation-based \emph{hypothesis test} companion is
+#' \code{\link{t_hermite}} (or \code{\link{hermite_test}} for a joint test of
+#' all distributional aspects).
+#'
 #' @param x A numeric vector of observations for the first group (or baseline),
 #'   or a two-sided \code{\link[stats]{formula}} of the form \code{response ~ group}.
 #' @param y A numeric vector of observations for the second group (or intervention).
 #'   Ignored when \code{x} is a formula.
 #' @param data An optional data frame, list, or environment containing the
-#'   variables referenced in \code{formula}.
+#'   variables referenced in the formula.
 #' @param degree Integer scalar; maximum polynomial degree for the marginal
 #'   quantile functions (default \code{3}). Automatically reduced if
 #'   monotonicity is violated or too few unique values are available; see
 #'   \code{\link{hermite_fit}}.
 #' @param copula Character string specifying the copula mode used for the paired
 #'   correlation (\code{\link{cor_hermite}}) when \code{paired = TRUE}:
-#'   \code{"none"} (default, copula-free cross-moments) or \code{"gaussian"} (Mehler identity).
+#'   \code{"none"} (default, copula-free cross-moments) or \code{"gaussian"}
+#'   (Mehler identity).
 #' @param monotonicity Monotonicity constraint passed to \code{\link{hermite_fit}}:
 #'   \describe{
 #'     \item{\code{"relaxed"}}{(Default) Empirical rank-concordance criterion.
@@ -91,10 +101,9 @@
 #'         independent-groups effect sizes (e.g. in meta-analysis).
 #'   \item \strong{Standardized mean change} (\eqn{d_z}): standardized by the
 #'         regularized SD of the observed change scores \eqn{D = X_2 - X_1},
-#'         fitted directly as its own quantile model (rather than reconstructed
-#'         from the marginal moments), so that
-#'         \deqn{d_z = \frac{\hat\mu_D}{\hat\sigma_D}}
-#'         with \eqn{\hat\sigma_D = \sqrt{\hat\sigma_1^2 + \hat\sigma_2^2 - 2 r_{\mathrm{Hermite}}\hat\sigma_1\hat\sigma_2}}.
+#'         fitted directly as its own quantile model, so that
+#'         \eqn{d_z = \hat\mu_D / \hat\sigma_D} with
+#'         \eqn{\hat\sigma_D = \sqrt{\hat\sigma_1^2 + \hat\sigma_2^2 - 2 r_{\mathrm{Hermite}}\hat\sigma_1\hat\sigma_2}}.
 #' }
 #' }
 #'
@@ -106,18 +115,22 @@
 #'   \item{\code{d_reg}}{The regularized standardized mean difference on the
 #'     raw scale (standardized by \eqn{\hat\sigma_{\mathrm{avg}}}).}
 #'   \item{\code{d_z}}{Standardized mean change score (only if \code{paired = TRUE}).}
-#'   \item{\code{hedges_g}}{Small-sample bias-corrected Hedges' \eqn{g} (always reported as a benchmark).}
-#'   \item{\code{glass_delta}}{Glass's \eqn{\Delta} using only the Group 1 SD (always reported as a benchmark).}
+#'   \item{\code{hedges_g}}{Small-sample bias-corrected Hedges' \eqn{g} (benchmark).}
+#'   \item{\code{glass_delta}}{Glass's \eqn{\Delta} using only the Group 1 SD (benchmark).}
 #'   \item{\code{type}, \code{paired}, \code{copula}}{Settings used.}
-#'   \item{\code{n1, n2}}{Group sample sizes.}
-#'   \item{\code{group1, group2}}{Regularized and raw moments per group (\code{mean}, \code{sd}, \code{variance}, \code{raw_mean}, \code{raw_sd}).}
+#'   \item{\code{n1}, \code{n2}}{Group sample sizes.}
+#'   \item{\code{group1}, \code{group2}}{Regularized and raw moments per group
+#'     (\code{mean}, \code{sd}, \code{variance}, \code{raw_mean}, \code{raw_sd}).}
 #'   \item{\code{diff_moments}}{Moments of the difference scores (paired only).}
-#'   \item{\code{r_Hermite_paired}}{The \code{\link{cor_hermite}} object for the paired observations (paired only).}
-#'   \item{\code{sd_standardizer}}{The standard deviation actually used to standardize \code{estimate}.}
+#'   \item{\code{r_Hermite_paired}}{The \code{\link{cor_hermite}} object for the
+#'     paired observations (paired only).}
+#'   \item{\code{sd_standardizer}}{The standard deviation actually used to
+#'     standardize \code{estimate}.}
 #'   \item{\code{degrees}}{Realized polynomial degrees per group.}
 #'   \item{\code{monotonicity}}{Monotonicity constraint applied.}
-#'   \item{\code{fit1, fit2}}{Underlying \code{\link{hermite_fit}} objects.}
-#'   \item{\code{ci}, \code{conf_level}, \code{ci_method}}{Confidence interval results, if requested.}
+#'   \item{\code{fit1}, \code{fit2}}{Underlying \code{\link{hermite_fit}} objects.}
+#'   \item{\code{ci}, \code{conf_level}, \code{ci_method}}{Confidence interval
+#'     results, if requested.}
 #' }
 #'
 #' @references
@@ -129,13 +142,11 @@
 #'
 #' Hedges, L. V. (1981). Distribution theory for Glass's estimator of effect size and related estimators. \emph{Journal of Educational Statistics}, 6(2), 107-128. \doi{10.3102/10769986006002107}
 #'
-#' Isserlis, L. (1918). On a formula for the product-moment coefficient of any order of a normal frequency distribution. \emph{Biometrika}, 12(1/2), 134-139. \doi{10.1093/biomet/12.1-2.134}
-#'
-#' Lecoutre, B. (2007). Another look at the confidence intervals for the noncentral T distribution. \emph{Journal of Modern Applied Statistical Methods}, 6(1), 107-116. \doi{10.22237/jmasm/1177992600}
-#'
 #' Lenhard, W., & Lenhard, A. (submitted). Distribution-Free Effect Size Estimation: A Robust Alternative to Cohen's d and other effect size estimators. \emph{Behavior Research Methods}.
 #'
-#' @seealso \code{\link{cor_hermite}}, \code{\link{hermite_fit}}, \code{\link{d_cohen}}, \code{\link{hedges_g}}
+#' @seealso \code{\link{t_hermite}} (matched hypothesis test),
+#'   \code{\link{hermite_test}}, \code{\link{cor_hermite}},
+#'   \code{\link{hermite_fit}}, \code{\link{d_cohen}}, \code{\link{hedges_g}}
 #'
 #' @examples
 #' # 1. Independent groups with non-normal, skewed data
@@ -148,17 +159,18 @@
 #'
 #' # 2. Formula interface
 #' dat <- data.frame(
-#'   rt = c(ctrl, trt),
+#'   rt   = c(ctrl, trt),
 #'   cond = factor(rep(c("Control", "Treatment"), each = 30))
 #' )
-#' fit_form <- d_reg(rt ~ cond, data = dat, conf_level = 0.95)
-#' print(fit_form)
+#' d_reg(rt ~ cond, data = dat, conf_level = 0.95)
 #'
 #' # 3. Paired / repeated-measures design
 #' pre  <- rlnorm(25, meanlog = 3.0, sdlog = 0.4)
 #' post <- pre + rnorm(25, mean = 4.0, sd = 1.5)
-#' fit_paired <- d_reg(pre, post, paired = TRUE, conf_level = 0.95)
-#' print(fit_paired)
+#' d_reg(pre, post, paired = TRUE, conf_level = 0.95)
+#'
+#' # 4. Matched hypothesis test for the same estimand
+#' t_hermite(ctrl, trt, nperm = 500)
 #'
 #' @author Wolfgang Lenhard, Alexandra Lenhard
 #' @export
@@ -177,22 +189,18 @@ d_reg.formula <- function(x, data = NULL, degree = 3L,
                           ci_method = c("bootstrap", "nct"),
                           B = 1000L, ...) {
 
-  if (missing(x) || (length(x) != 3L)) {
+  if (missing(x) || length(x) != 3L) {
     stop("Formula must be of the form 'response ~ group'.")
   }
-  mf <- stats::model.frame(formula = x, data = data)
+  mf       <- stats::model.frame(formula = x, data = data)
   response <- mf[[1L]]
-  group <- as.factor(mf[[2L]])
-
+  group    <- as.factor(mf[[2L]])
   levels_g <- levels(group)
-  if (length(levels_g) != 2L) {
-    stop("Grouping variable must have exactly two levels.")
-  }
+  if (length(levels_g) != 2L) stop("Grouping variable must have exactly two levels.")
 
-  x1 <- response[group == levels_g[1L]]
-  x2 <- response[group == levels_g[2L]]
-
-  res <- d_reg.default(x = x1, y = x2, degree = degree, copula = copula,
+  res <- d_reg.default(x = response[group == levels_g[1L]],
+                       y = response[group == levels_g[2L]],
+                       degree = degree, copula = copula,
                        monotonicity = monotonicity, paired = paired, type = type,
                        conf_level = conf_level, ci_method = ci_method, B = B, ...)
   res$group_labels <- levels_g
@@ -218,9 +226,9 @@ d_reg.default <- function(x, y = NULL, degree = 3L,
   if (missing(y) || is.null(y)) stop("Vector 'y' must be supplied.")
 
   if (paired) {
+    if (length(x) != length(y)) stop("Paired observations must have equal length.")
     ok <- is.finite(x) & is.finite(y)
     x1 <- x[ok]; x2 <- y[ok]
-    if (length(x1) != length(x2)) stop("Paired observations must have equal length.")
   } else {
     x1 <- x[is.finite(x)]
     x2 <- y[is.finite(y)]
@@ -229,38 +237,35 @@ d_reg.default <- function(x, y = NULL, degree = 3L,
   n1 <- length(x1); n2 <- length(x2)
   if (n1 < 3L || n2 < 3L) stop("Each group must contain at least 3 valid observations.")
 
-  # Fit marginal polynomial quantile distributions
+  # Marginal quantile models and regularized moments
   fit1 <- hermite_fit(x1, degree = degree, monotonicity = monotonicity, force_odd = TRUE)
   fit2 <- hermite_fit(x2, degree = degree, monotonicity = monotonicity, force_odd = TRUE)
-
   m1 <- hermite_moments(fit1)
   m2 <- hermite_moments(fit2)
 
-  # Averaged standardizer for independent groups (Cohen 1988, Delacre 2021)
-  sd_avg <- sqrt((m1$variance + m2$variance) / 2.0)
+  # Averaged standardizer (Cohen, 1988; Delacre et al., 2021)
+  sd_avg    <- sqrt((m1$variance + m2$variance) / 2.0)
+  d_reg_val <- (m2$mean - m1$mean) / sd_avg
 
-  # If paired, compute difference distribution and Hermite correlation
+  # Paired: difference-score model and Hermite correlation
   if (paired) {
-    diff_scores <- x2 - x1
-    fit_diff <- hermite_fit(diff_scores, degree = degree, monotonicity = monotonicity, force_odd = TRUE)
+    fit_diff <- hermite_fit(x2 - x1, degree = degree,
+                            monotonicity = monotonicity, force_odd = TRUE)
     m_diff <- hermite_moments(fit_diff)
-    r_Hermite_fit <- .cor_hermite_assemble(fit1, fit2, poly_degree_requested = degree,
-                                      copula = copula, monotonicity = monotonicity,
-                                      ties_method = "average")
-
-    # d_z: standardized mean change; d_reg_val: raw-scale repeated-measures SMD
+    r_Hermite_fit <- .cor_hermite_assemble(fit1, fit2,
+                                           poly_degree_requested = degree,
+                                           copula = copula,
+                                           monotonicity = monotonicity,
+                                           ties_method = "average")
     d_z <- m_diff$mean / m_diff$sd
-    d_reg_val <- (m2$mean - m1$mean) / sd_avg
   } else {
     fit_diff <- NULL; m_diff <- NULL; r_Hermite_fit <- NULL; d_z <- NULL
-    d_reg_val <- (m2$mean - m1$mean) / sd_avg
   }
 
   # Classical benchmarks
   s1 <- stats::sd(x1); s2 <- stats::sd(x2)
   sd_pooled <- sqrt(((n1 - 1L) * s1^2 + (n2 - 1L) * s2^2) / (n1 + n2 - 2L))
-  j_corr <- hedges_correction(n1 + n2 - 2L)
-  g_hedges <- ((mean(x2) - mean(x1)) / sd_pooled) * j_corr
+  g_hedges    <- ((mean(x2) - mean(x1)) / sd_pooled) * hedges_correction(n1 + n2 - 2L)
   glass_delta <- (mean(x2) - mean(x1)) / s1
 
   combined_uses_hedges <- (n1 > 50L && n2 > 50L && abs(d_reg_val) > 0.8)
@@ -272,7 +277,6 @@ d_reg.default <- function(x, y = NULL, degree = 3L,
     "glass"       = glass_delta,
     "combined"    = if (combined_uses_hedges) g_hedges else d_reg_val
   )
-
   sd_standardizer <- switch(
     type,
     "glass"       = s1,
@@ -282,27 +286,29 @@ d_reg.default <- function(x, y = NULL, degree = 3L,
   )
 
   res <- list(
-    estimate        = primary_d,
-    d_reg           = d_reg_val,
-    d_z             = d_z,
-    hedges_g        = g_hedges,
-    glass_delta     = glass_delta,
-    type            = type,
-    paired          = paired,
-    copula          = copula,
-    n1              = n1,
-    n2              = n2,
-    group1          = list(mean = m1$mean, sd = m1$sd, variance = m1$variance, raw_mean = mean(x1), raw_sd = s1),
-    group2          = list(mean = m2$mean, sd = m2$sd, variance = m2$variance, raw_mean = mean(x2), raw_sd = s2),
-    diff_moments    = m_diff,
-    r_Hermite_paired     = r_Hermite_fit,
-    sd_standardizer = sd_standardizer,
-    degrees         = c(g1 = fit1$degree, g2 = fit2$degree),
-    monotonicity    = monotonicity,
-    fit1            = fit1,
-    fit2            = fit2,
-    x1              = x1,
-    x2              = x2
+    estimate         = primary_d,
+    d_reg            = d_reg_val,
+    d_z              = d_z,
+    hedges_g         = g_hedges,
+    glass_delta      = glass_delta,
+    type             = type,
+    paired           = paired,
+    copula           = copula,
+    n1               = n1,
+    n2               = n2,
+    group1           = list(mean = m1$mean, sd = m1$sd, variance = m1$variance,
+                            raw_mean = mean(x1), raw_sd = s1),
+    group2           = list(mean = m2$mean, sd = m2$sd, variance = m2$variance,
+                            raw_mean = mean(x2), raw_sd = s2),
+    diff_moments     = m_diff,
+    r_Hermite_paired = r_Hermite_fit,
+    sd_standardizer  = sd_standardizer,
+    degrees          = c(g1 = fit1$degree, g2 = fit2$degree),
+    monotonicity     = monotonicity,
+    fit1             = fit1,
+    fit2             = fit2,
+    x1               = x1,
+    x2               = x2
   )
   class(res) <- "d_reg"
 
@@ -315,7 +321,7 @@ d_reg.default <- function(x, y = NULL, degree = 3L,
 }
 
 # -----------------------------------------------------------------------------
-# S3 Methods for d_reg: confint, print, summary
+# S3 Methods: confint, print, summary
 # -----------------------------------------------------------------------------
 
 #' Confidence Intervals for Distribution-Free Effect Sizes
@@ -325,41 +331,34 @@ d_reg.default <- function(x, y = NULL, degree = 3L,
 #'
 #' @param object An object of class \code{"d_reg"} created by \code{\link{d_reg}}.
 #' @param parm Ignored; included for S3 method consistency with \code{\link[stats]{confint}}.
-#' @param level Numeric scalar in \eqn{(0, 1)}; the requested confidence level (default is \code{0.95}).
-#' @param method Character string specifying the confidence interval calculation method:
+#' @param level Numeric scalar in \eqn{(0, 1)}; the requested confidence level
+#'   (default \code{0.95}).
+#' @param method Character string specifying the confidence interval method:
 #'   \describe{
-#'     \item{\code{"bootstrap"}}{(Default) Non-parametric percentile bootstrap, refitting the
-#'       entire regularized quantile pipeline on each resample.}
-#'     \item{\code{"nct"}}{Analytical inversion of the noncentral \eqn{t} (lambda-prime)
-#'       distribution, treating the regularized point estimate as a pseudo-t pivot.}
+#'     \item{\code{"bootstrap"}}{(Default) Non-parametric percentile bootstrap,
+#'       refitting the entire regularized quantile pipeline on each resample
+#'       (preserving the paired structure where applicable).}
+#'     \item{\code{"nct"}}{Analytical inversion of the noncentral \eqn{t}
+#'       (lambda-prime) distribution, treating the regularized point estimate
+#'       as a pseudo-\eqn{t} pivot; see \code{\link{ci_nct}}.}
 #'   }
-#' @param B Integer scalar; number of bootstrap replications when \code{method = "bootstrap"}
-#'   (default is \code{1000L}).
+#' @param B Integer scalar; number of bootstrap replications when
+#'   \code{method = "bootstrap"} (default \code{1000L}).
 #' @param ... Additional arguments passed to internal methods.
 #'
 #' @details
-#' \subsection{Bootstrap Intervals (\code{method = "bootstrap"})}{
-#' In each bootstrap replication, observations are resampled with replacement (preserving
-#' paired structure if \code{object$paired = TRUE}), and the full quantile regularization
-#' pipeline is refitted from scratch. The \eqn{100(1 - \alpha)\%} interval is formed from the
-#' empirical percentiles \eqn{\alpha/2} and \eqn{1 - \alpha/2}.
-#' }
-#' \subsection{Noncentral-t Inversion (\code{method = "nct"})}{
-#' Computes exact confidence limits by inverting the cumulative noncentral \eqn{t}
-#' distribution (Lecoutre, 2007) with degrees of freedom and effective sample size \eqn{\tilde{n}}
-#' adapted to the design:
-#' \itemize{
-#'   \item \strong{Independent groups:} \eqn{\tilde{n} = n_1 n_2 / (n_1 + n_2)} and \eqn{\mathrm{df} = n_1 + n_2 - 2}.
-#'   \item \strong{Paired designs / Glass's \eqn{\Delta}:} \eqn{\tilde{n} = n_1} and \eqn{\mathrm{df} = n_1 - 1}.
-#' }
-#' }
+#' For \code{method = "nct"}, degrees of freedom and effective sample size
+#' \eqn{\tilde{n}} are adapted to the design: independent groups use
+#' \eqn{\tilde{n} = n_1 n_2 / (n_1 + n_2)} with \eqn{\mathrm{df} = n_1 + n_2 - 2};
+#' paired designs and Glass's \eqn{\Delta} use \eqn{\tilde{n} = n_1} with
+#' \eqn{\mathrm{df} = n_1 - 1}.
 #'
-#' @return A numeric matrix of dimension \code{1 x 2} containing the lower and upper
-#'   confidence limits, with column names indicating the corresponding percentiles.
+#' @return A numeric matrix of dimension \code{1 x 2} containing the lower and
+#'   upper confidence limits, with column names indicating the corresponding
+#'   percentiles.
 #'
 #' @references
-#' Lecoutre, B. (2007). Another look at the confidence intervals for the noncentral T distribution.
-#' \emph{Journal of Modern Applied Statistical Methods}, 6(1), 107–116. \doi{10.22237/jmasm/1177992600}
+#' Lecoutre, B. (2007). Another look at the confidence intervals for the noncentral T distribution. \emph{Journal of Modern Applied Statistical Methods}, 6(1), 107-116. \doi{10.22237/jmasm/1177992600}
 #'
 #' @examples
 #' set.seed(42)
@@ -367,13 +366,10 @@ d_reg.default <- function(x, y = NULL, degree = 3L,
 #' trt  <- rlnorm(25, meanlog = 2.3, sdlog = 0.5)
 #' fit <- d_reg(ctrl, trt)
 #'
-#' # Non-parametric Percentile Bootstrap 95% CI
 #' confint(fit, level = 0.95, method = "bootstrap", B = 500)
-#'
-#' # Analytical Noncentral-t 95% CI
 #' confint(fit, level = 0.95, method = "nct")
 #'
-#' @seealso \code{\link{d_reg}}
+#' @seealso \code{\link{d_reg}}, \code{\link{ci_nct}}
 #' @export
 confint.d_reg <- function(object, parm, level = 0.95,
                           method = c("bootstrap", "nct"), B = 1000L, ...) {
@@ -382,40 +378,38 @@ confint.d_reg <- function(object, parm, level = 0.95,
 
   if (method == "bootstrap") {
     x1 <- object$x1; x2 <- object$x2
-    boot_d <- numeric(B)
+    boot_d <- rep(NA_real_, B)
     for (b in seq_len(B)) {
-      if (object$paired) {
-        idx <- sample.int(n1, n1, replace = TRUE)
-        fb <- d_reg(x1[idx], x2[idx], degree = max(object$degrees),
-                    copula = object$copula, monotonicity = object$monotonicity,
-                    paired = TRUE, type = object$type)
-      } else {
-        s1 <- sample(x1, n1, replace = TRUE)
-        s2 <- sample(x2, n2, replace = TRUE)
-        fb <- d_reg(s1, s2, degree = max(object$degrees),
-                    copula = object$copula, monotonicity = object$monotonicity,
-                    paired = FALSE, type = object$type)
-      }
-      boot_d[b] <- fb$estimate
+      fb <- tryCatch({
+        if (object$paired) {
+          idx <- sample.int(n1, n1, replace = TRUE)
+          d_reg(x1[idx], x2[idx], degree = max(object$degrees),
+                copula = object$copula, monotonicity = object$monotonicity,
+                paired = TRUE, type = object$type)
+        } else {
+          d_reg(sample(x1, n1, replace = TRUE), sample(x2, n2, replace = TRUE),
+                degree = max(object$degrees), copula = object$copula,
+                monotonicity = object$monotonicity, paired = FALSE,
+                type = object$type)
+        }
+      }, error = function(e) NULL)
+      if (!is.null(fb)) boot_d[b] <- fb$estimate
     }
     alpha <- (1 - level) / 2
     ci <- stats::quantile(boot_d, probs = c(alpha, 1 - alpha), na.rm = TRUE)
   } else {
-    if (object$paired) {
-      df <- n1 - 1L
-      n_tilde <- n1
-    } else if (object$type == "glass") {
-      df <- n1 - 1L
-      n_tilde <- n1
+    if (object$paired || object$type == "glass") {
+      df <- n1 - 1L; n_tilde <- n1
     } else {
-      df <- n1 + n2 - 2L
-      n_tilde <- (n1 * n2) / (n1 + n2)
+      df <- n1 + n2 - 2L; n_tilde <- (n1 * n2) / (n1 + n2)
     }
-    ci <- ci_nct(object$estimate, n1 = n1, n2 = n2, conf = level, df = df, n_tilde = n_tilde)
+    ci <- ci_nct(object$estimate, n1 = n1, n2 = n2, conf = level,
+                 df = df, n_tilde = n_tilde)
   }
 
-  matrix(ci, nrow = 1L, dimnames = list("d_reg", c(paste0(100 * (1 - level)/2, " %"),
-                                                   paste0(100 * (1 + level)/2, " %"))))
+  matrix(ci, nrow = 1L,
+         dimnames = list("d_reg", c(paste0(100 * (1 - level) / 2, " %"),
+                                    paste0(100 * (1 + level) / 2, " %"))))
 }
 
 #' @export
@@ -424,12 +418,17 @@ print.d_reg <- function(x, digits = 3L, ...) {
   cat(strrep("-", 52), "\n", sep = "")
 
   if (x$paired) {
-    cop_lbl <- if (!is.null(x$copula) && x$copula == "gaussian") " [Gaussian]" else " [Copula-Free]"
+    cop_lbl <- if (!is.null(x$copula) && x$copula == "gaussian") {
+      " [Gaussian]"
+    } else " [Copula-Free]"
     cat(sprintf("  Effect Size (d_reg, raw scale)    :  %.*f\n", digits, x$d_reg))
     cat(sprintf("  Standardized Mean Change (d_z)    :  %.*f\n", digits, x$d_z))
-    cat(sprintf("  Paired Hermite Correlation (r_Hermite) :  %.*f%s\n", digits, x$r_Hermite_paired$r_Hermite, cop_lbl))
-    cat(sprintf("  Averaged Model SD (sigma_avg)     :  %.*f\n", digits, sqrt((x$group1$variance + x$group2$variance) / 2)))
-    cat(sprintf("  Difference Model SD (sigma_diff)  :  %.*f\n", digits, x$diff_moments$sd))
+    cat(sprintf("  Paired Hermite Correlation (r)    :  %.*f%s\n",
+                digits, x$r_Hermite_paired$r_Hermite, cop_lbl))
+    cat(sprintf("  Averaged Model SD (sigma_avg)     :  %.*f\n",
+                digits, sqrt((x$group1$variance + x$group2$variance) / 2)))
+    cat(sprintf("  Difference Model SD (sigma_diff)  :  %.*f\n",
+                digits, x$diff_moments$sd))
   } else {
     cat(sprintf("  Effect Size (d_reg)               :  %.*f\n", digits, x$estimate))
   }
@@ -437,7 +436,8 @@ print.d_reg <- function(x, digits = 3L, ...) {
   cat(sprintf("  Standardizer Used (denominator)   :  %.*f\n", digits, x$sd_standardizer))
   cat(sprintf("  Hedges' g (Benchmark)             :  %.*f\n", digits, x$hedges_g))
   cat(sprintf("  Sample Sizes                      :  n1 = %d, n2 = %d\n", x$n1, x$n2))
-  cat(sprintf("  Polynomial Degrees                :  g1 = %d, g2 = %d\n", x$degrees["g1"], x$degrees["g2"]))
+  cat(sprintf("  Polynomial Degrees                :  g1 = %d, g2 = %d\n",
+              x$degrees["g1"], x$degrees["g2"]))
   cat(sprintf("  Monotonicity Check                :  %s\n", x$monotonicity))
 
   if (!is.null(x$ci)) {
@@ -454,9 +454,11 @@ summary.d_reg <- function(object, digits = 3L, ...) {
   print(object, digits = digits, ...)
   cat("  Group Distributional Moments (Polynomial Modeled):\n")
   cat(sprintf("    Group 1: Mean = %.*f, SD = %.*f, Var = %.*f\n",
-              digits, object$group1$mean, digits, object$group1$sd, digits, object$group1$variance))
+              digits, object$group1$mean, digits, object$group1$sd,
+              digits, object$group1$variance))
   cat(sprintf("    Group 2: Mean = %.*f, SD = %.*f, Var = %.*f\n",
-              digits, object$group2$mean, digits, object$group2$sd, digits, object$group2$variance))
+              digits, object$group2$mean, digits, object$group2$sd,
+              digits, object$group2$variance))
   cat("\n")
   invisible(object)
 }

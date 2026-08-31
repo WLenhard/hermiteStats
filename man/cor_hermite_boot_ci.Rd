@@ -2,7 +2,7 @@
 % Please edit documentation in R/cor_hermite.R
 \name{cor_hermite_boot_ci}
 \alias{cor_hermite_boot_ci}
-\title{Percentile Bootstrap Confidence Interval for Hermite Correlation}
+\title{Percentile Bootstrap Confidence Interval for the Hermite Correlation}
 \usage{
 cor_hermite_boot_ci(
   object,
@@ -33,5 +33,10 @@ cor_hermite_boot_ci(
 An object of class \code{"cor_hermite_boot_ci"}.
 }
 \description{
-Percentile Bootstrap Confidence Interval for Hermite Correlation
+Non-parametric percentile bootstrap for a fitted \code{"cor_hermite"}
+object, refitting the entire pipeline (NQT, monotone quantile models,
+covariance) on every resample.
+}
+\seealso{
+\code{\link{cor_hermite}}, \code{\link{confint.cor_hermite}}
 }

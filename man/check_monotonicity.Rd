@@ -23,14 +23,14 @@ covers essentially the entire probability mass for common sample sizes.}
 \describe{
   \item{\code{"relaxed"}}{(Default) Checks that the fitted values
     \eqn{\hat{x} = f(z)} rank-correlate with \eqn{z} at
-    \eqn{\rho_{\text{Spearman}} \ge 0.95} and that the linear coefficient
+    \eqn{\rho_{\mathrm{Spearman}} \ge 0.95} and that the linear coefficient
     is positive (\eqn{\beta_1 > 0}). This tolerates tiny, practically
     irrelevant non-monotonicities (e.g. from heavy ties) while rejecting
     polynomials with genuine reversals.}
   \item{\code{"strict"}}{Requires the first derivative \eqn{f'(z)} to be
     non-negative everywhere on \code{z_range}. The global minimum of
     \eqn{f'(z)} is found analytically by locating the roots of
-    \eqn{f''(z)} via polyroot and evaluating
+    \eqn{f''(z)} via \code{\link[base]{polyroot}} and evaluating
     \eqn{f'(z)} at these critical points and at the interval endpoints.}
   \item{\code{"none"}}{Skips the check and always returns \code{TRUE}.
     Useful for diagnostic purposes or when monotonicity is already
@@ -42,9 +42,10 @@ evaluate the \code{"relaxed"} criterion. If omitted, an evenly spaced
 grid of 100 points over \code{z_range} is used instead.}
 }
 \value{
-A list with elements \code{is_monotonic} (logical), \code{min_derivative}
-  (only computed for \code{method = "strict"}), \code{rank_concordance} (only
-  computed for \code{method = "relaxed"}), and \code{method}.
+A list with elements \code{is_monotonic} (logical),
+  \code{min_derivative} (only computed for \code{method = "strict"}),
+  \code{rank_concordance} (only computed for \code{method = "relaxed"}),
+  and \code{method}.
 }
 \description{
 A fitted quantile function \eqn{X = f(Z)} must be non-decreasing to be a

@@ -4,7 +4,7 @@
 \alias{t_hermite}
 \alias{t_hermite.formula}
 \alias{t_hermite.default}
-\title{Distribution-Robust Permutation Test for Mean Differences (Hermite t-Test)}
+\title{Distribution-Robust Mean Difference Test (Hermite t-Test)}
 \usage{
 t_hermite(x, ...)
 
@@ -12,13 +12,10 @@ t_hermite(x, ...)
   formula,
   data = NULL,
   paired = FALSE,
+  method = c("permutation", "analytical"),
   degree = 3L,
-  copula = c("none", "gaussian"),
-  monotonicity = c("relaxed", "strict", "none"),
-  type = c("regularized", "hedges", "glass", "combined"),
   alternative = c("two.sided", "greater", "less"),
-  nperm = 2000L,
-  min_success = 0.9,
+  nperm = 1000L,
   ...
 )
 
@@ -26,86 +23,115 @@ t_hermite(x, ...)
   x,
   y,
   paired = FALSE,
+  method = c("permutation", "analytical"),
   degree = 3L,
-  copula = c("none", "gaussian"),
-  monotonicity = c("relaxed", "strict", "none"),
-  type = c("regularized", "hedges", "glass", "combined"),
   alternative = c("two.sided", "greater", "less"),
-  nperm = 2000L,
-  min_success = 0.9,
+  nperm = 1000L,
   ...
 )
 }
 \arguments{
-\item{x}{A numeric vector of observations for the first group (or baseline in a paired design),
-or a two-sided \code{\link[stats]{formula}} of the form \code{response ~ group}.}
+\item{x}{A numeric vector of observations for Group 1 (or the baseline in
+paired designs), or a two-sided \code{\link[stats]{formula}} of the form
+\code{response ~ group}.}
 
 \item{...}{Additional arguments passed to methods.}
 
-\item{formula}{A two-sided \code{\link[stats]{formula}} of the form \code{response ~ group}.}
+\item{formula}{A two-sided formula of the form \code{response ~ group}.}
 
-\item{data}{An optional data frame, list, or environment containing variables in \code{formula}.}
+\item{data}{An optional data frame containing the variables in \code{formula}.}
 
-\item{paired}{Logical; \code{TRUE} for a paired-samples design. Default is \code{FALSE}.}
+\item{paired}{Logical; \code{TRUE} for a paired-samples design. Default \code{FALSE}.}
 
-\item{degree}{Integer scalar; maximum polynomial degree used for quantile fits (default \code{3L}).}
+\item{method}{Character string; \code{"permutation"} (default) or
+\code{"analytical"} (approximate closed form). See Details.}
 
-\item{copula}{Character string; copula mode for paired designs (\code{"none"} or \code{"gaussian"}).}
+\item{degree}{Integer scalar; polynomial degree for the quantile models
+(default \code{3L}; must be an odd integer \eqn{\ge 1}).}
 
-\item{monotonicity}{Monotonicity constraint: \code{"relaxed"} (default), \code{"strict"}, or \code{"none"}.}
+\item{alternative}{Alternative hypothesis: \code{"two.sided"} (default),
+\code{"greater"} (\eqn{\mu_2 > \mu_1}), or \code{"less"} (\eqn{\mu_2 < \mu_1}).}
 
-\item{type}{Effect-size variant: \code{"regularized"} (default), \code{"hedges"}, \code{"glass"}, or \code{"combined"}.}
+\item{nperm}{Integer; number of permutation resamples (default \code{1000L}).}
 
-\item{alternative}{Character string specifying the alternative hypothesis: \code{"two.sided"} (default), \code{"greater"}, or \code{"less"}.}
-
-\item{nperm}{Integer; number of permutation resamples (default \code{2000L}).}
-
-\item{min_success}{Minimum proportion of successful permutation replicates required (default \code{0.90}).}
-
-\item{y}{A numeric vector of observations for the second group (or post-measurement in paired designs).}
+\item{y}{Numeric vector of observations for Group 2 (or the post-measurement
+in paired designs).}
 }
 \value{
-An S3 object of class \code{"t_hermite"}.
+An S3 object of class \code{"t_hermite"} containing, among others:
+\describe{
+  \item{\code{statistic}}{Observed studentized statistic \eqn{t_{\mathrm{Hermite}}}.}
+  \item{\code{p_value}}{Permutation or analytical \eqn{p}-value.}
+  \item{\code{mean_diff}}{Regularized mean difference (Group 2 \eqn{-} Group 1,
+    or mean of the difference scores if paired).}
+  \item{\code{d_reg}}{Standardized effect size (mean difference divided by
+    \eqn{\hat\sigma_{\mathrm{avg}}}).}
+  \item{\code{mean1}, \code{mean2}, \code{sd1}, \code{sd2}}{Regularized group moments.}
+  \item{\code{se_diff}, \code{df}}{Standard error and (Welch) degrees of freedom.}
+  \item{\code{perm_distribution}}{Permutation null statistics (permutation mode).}
+  \item{\code{n_perm_success}, \code{success_rate}}{Permutation bookkeeping.}
+}
 }
 \description{
-Computes a permutation test for the difference in means between two
-independent groups or paired (repeated) measurements, using the distribution-robust
-polynomial-quantile-regularized effect size (\eqn{d_{\mathrm{reg}}} or \eqn{d_z})
-from \code{\link{d_reg}} as the test statistic.
+Tests the null hypothesis of equal population means,
+\eqn{H_0: \mu_2 = \mu_1}, for two independent groups or paired
+measurements, using the regularized mean \eqn{\hat\mu = \hat a_0} of the
+fitted polynomial quantile model in place of the raw sample mean.
+}
+\details{
+\subsection{Statistic}{
+The test statistic is the studentized regularized mean difference
+\deqn{t_{\mathrm{Hermite}} = \frac{\hat\mu_2 - \hat\mu_1}
+      {\sqrt{\hat\sigma_1^2/n_1 + \hat\sigma_2^2/n_2}},}
+where \eqn{\hat\mu = \hat a_0} and
+\eqn{\hat\sigma^2 = \sum_{m \ge 1} \hat a_m^2\, m!} are the closed-form
+Hermite moments (Parseval's identity). For paired designs the statistic is
+\eqn{\hat\mu_D / (\hat\sigma_D / \sqrt{n})}, where the difference scores
+\eqn{D = X_2 - X_1} receive their own quantile fit.
+}
+
+\subsection{Inference (\code{method})}{
+\describe{
+  \item{\code{"permutation"} (default)}{Each group is aligned by
+    subtracting its regularized mean; the pooled residuals are permuted
+    across groups (or difference-score signs are flipped, if paired), and
+    the full quantile pipeline is refitted on every resample. This yields
+    well-calibrated Type I error across normal, skewed, and heavy-tailed
+    distributions, and is the recommended mode.}
+  \item{\code{"analytical"}}{Student-\eqn{t} reference with
+    Welch-Satterthwaite degrees of freedom based on the asymptotic standard
+    errors \eqn{\hat\sigma/\sqrt{n}}. Fast, but only approximate in small
+    or strongly non-normal samples; prefer permutation for reported
+    results.}
+}
+}
 }
 \examples{
-# 1. Independent groups (vectors)
 set.seed(42)
-ctrl <- rlnorm(25, meanlog = 2.0, sdlog = 0.5)
-trt  <- rlnorm(25, meanlog = 2.3, sdlog = 0.5)
-test1 <- t_hermite(ctrl, trt, nperm = 500)
-print(test1)
-plot(test1)
+ctrl <- rlnorm(30, meanlog = 2.0, sdlog = 0.5)
+trt  <- rlnorm(30, meanlog = 2.4, sdlog = 0.5)
 
-# 2. Formula interface
-df_test <- data.frame(
-  score = c(ctrl, trt),
-  group = factor(rep(c("Ctrl", "Trt"), each = 25))
-)
-test_form <- t_hermite(score ~ group, data = df_test, nperm = 500)
-print(test_form)
+# Permutation test (default)
+res <- t_hermite(ctrl, trt, nperm = 500)
+print(res)
+plot(res)
 
-# 3. Paired / repeated-measures design
-pre  <- rlnorm(20, meanlog = 3.0, sdlog = 0.4)
-post <- pre + rnorm(20, mean = 3.0, sd = 1.5)
-test_paired <- t_hermite(pre, post, paired = TRUE, nperm = 500)
-print(test_paired)
+# Fast approximate analytical test
+t_hermite(ctrl, trt, method = "analytical")
 
-}
-\references{
-Anderson, M. J., & ter Braak, C. J. F. (2003). Permutation tests for multi-factorial analysis of variance. \emph{Journal of Statistical Computation and Simulation}, 73(2), 85–113. \doi{10.1080/00949650215733}
+# Formula interface
+df <- data.frame(val = c(ctrl, trt), grp = factor(rep(c("A", "B"), each = 30)))
+t_hermite(val ~ grp, data = df, nperm = 500)
 
-Edgington, E. S., & Onghena, P. (2007). \emph{Randomization Tests} (4th ed.). Chapman & Hall/CRC.
+# Paired design
+pre  <- rlnorm(25, meanlog = 3.0, sdlog = 0.4)
+post <- pre + rnorm(25, mean = 4.0, sd = 1.5)
+t_hermite(pre, post, paired = TRUE, nperm = 500)
 
-Phipson, B., & Smyth, G. K. (2010). Permutation P-values should never be zero: calculating exact P-values when permutations are randomly drawn. \emph{Statistical Applications in Genetics and Molecular Biology}, 9(1), Article 39. \doi{10.2202/1544-6115.1585}
 }
 \seealso{
-\code{\link{d_reg}}, \code{\link{shape_hermite}}, \code{\link{hermite_fit}}
+\code{\link{median_hermite}}, \code{\link{shape_hermite}},
+  \code{\link{hermite_test}}, \code{\link{d_reg}}
 }
 \author{
 Wolfgang Lenhard, Alexandra Lenhard

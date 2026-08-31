@@ -26,26 +26,30 @@ pcor_hermite(
 \item{z}{A numeric vector, matrix, or data frame of controlling covariates \eqn{\mathbf{Z}}.}
 
 \item{semi}{Logical; if \code{TRUE}, computes the semipartial (part) correlation
-where \code{z} is partialled out of \code{y} only. Default is \code{FALSE} (partial correlation).}
+where \code{z} is partialled out of \code{y} only. Default is \code{FALSE}
+(partial correlation).}
 
 \item{copula}{Character string; \code{"none"} (default, copula-free cross-moments)
 or \code{"gaussian"} (Mehler bilinear identity).}
 
 \item{poly_degree}{Integer; maximum polynomial degree (default \code{3L}).}
 
-\item{monotonicity}{Monotonicity constraint: \code{"relaxed"} (default), \code{"strict"}, or \code{"none"}.}
+\item{monotonicity}{Monotonicity constraint: \code{"relaxed"} (default),
+\code{"strict"}, or \code{"none"}.}
 
-\item{conf_level}{Numeric value in \eqn{(0, 1)} for confidence intervals, or \code{NULL} (default).}
+\item{conf_level}{Numeric value in \eqn{(0, 1)} for confidence intervals, or
+\code{NULL} (default).}
 
-\item{ci_method}{Method for CI: \code{"fisher"} (analytical Fisher z) or \code{"bootstrap"}.}
+\item{ci_method}{Method for CI: \code{"fisher"} (analytical Fisher \eqn{z}) or
+\code{"bootstrap"}.}
 
 \item{B}{Integer; number of bootstrap replications (default \code{1000L}).}
 
 \item{...}{Additional arguments passed to \code{\link{cor_hermite}}.}
 }
 \value{
-If \code{x} is a matrix or data frame (and \code{y} is \code{NULL}), returns an
-object of class \code{"pcor_hermite_matrix"} containing:
+If \code{x} is a matrix or data frame (and \code{y} is \code{NULL}), an object of
+class \code{"pcor_hermite_matrix"} containing:
 \describe{
   \item{\code{pcor}}{The \eqn{p \times p} partial correlation matrix.}
   \item{\code{r_Hermite}}{The \eqn{p \times p} pairwise Hermite correlation matrix.}
@@ -54,12 +58,13 @@ object of class \code{"pcor_hermite_matrix"} containing:
   \item{\code{n}}{Sample size.}
 }
 
-If \code{x}, \code{y}, and \code{z} are supplied, returns an object of class \code{"pcor_hermite"} containing:
+If \code{x}, \code{y}, and \code{z} are supplied, an object of class
+\code{"pcor_hermite"} containing:
 \describe{
   \item{\code{estimate}}{The partial or semipartial correlation point estimate.}
   \item{\code{rho_z_pcor}}{The latent copula partial correlation (if \code{copula = "gaussian"}).}
   \item{\code{attenuation}}{The partial shape-attenuation factor (if \code{copula = "gaussian"}).}
-  \item{\code{semi}}{Logical; whether semipartial correlation was computed.}
+  \item{\code{semi}}{Logical; whether a semipartial correlation was computed.}
   \item{\code{copula}}{The copula mode applied.}
   \item{\code{k_controls}}{Number of controlled covariates.}
   \item{\code{n}}{Number of complete cases.}
@@ -68,16 +73,16 @@ If \code{x}, \code{y}, and \code{z} are supplied, returns an object of class \co
 }
 \description{
 Computes the distribution-robust partial or semipartial correlation between
-two variables controlling for one or more covariates, or computes the full
-partial correlation matrix for a multivariate dataset via precision matrix inversion.
+two variables controlling for one or more covariates, or the full partial
+correlation matrix for a multivariate dataset via precision matrix inversion.
 }
 \examples{
-# 1. Full Partial Correlation Matrix (iris dataset)
+# 1. Full partial correlation matrix (iris dataset)
 data(iris)
 pcor_mat <- pcor_hermite(iris[, 1:4])
 print(pcor_mat)
 
-# 2. Specific Pair controlling for a Confounder
+# 2. Specific pair controlling for a confounder
 set.seed(42)
 z <- rlnorm(60, meanlog = 1, sdlog = 0.5)
 x <- 0.6 * z + rnorm(60, sd = 2)
@@ -86,4 +91,7 @@ y <- 0.7 * z + rnorm(60, sd = 2)
 fit_pcor <- pcor_hermite(x, y, z = z, conf_level = 0.95)
 print(fit_pcor)
 
+}
+\seealso{
+\code{\link{cor_hermite}}
 }

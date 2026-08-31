@@ -7,10 +7,13 @@
 Low-level routines that turn an empirical sample into a regularized,
 continuous quantile function and extract its population moments in closed
 algebraic form. These functions are the computational backbone shared by
-\code{\link{hermite_fit}}, \code{\link{cor_hermite}}, and \code{\link{d_reg}}.
+\code{\link{hermite_fit}}, \code{\link{cor_hermite}}, \code{\link{d_reg}},
+and the hypothesis-testing suite (\code{\link{hermite_test}},
+\code{\link{t_hermite}}, \code{\link{median_hermite}},
+\code{\link{shape_hermite}}).
 }
 \details{
-Every distribution handled by \code{hermiteStats} is represented as a
+Every distribution handled by \pkg{hermiteStats} is represented as a
 polynomial quantile function \eqn{X = f(Z)}, where \eqn{Z \sim \mathcal{N}(0,1)}
 is obtained from the data by rank-based inverse-normal transformation
 (Normal Quantile Transformation, NQT). Because \eqn{Z} is standard normal by
@@ -19,9 +22,10 @@ monic Probabilists' Hermite polynomials \eqn{He_m(z)}, which are orthogonal
 under the standard normal measure:
 \deqn{E[He_m(Z) He_n(Z)] = \delta_{mn}\, m!}
 This orthogonality turns the extraction of the mean, variance, skewness, and
-kurtosis of \eqn{f(Z)} into simple, closed-form algebraic sums over the fitted
-coefficients, evaluated exactly via the raw moments \eqn{E[Z^j]} of the standard
-normal distribution (a direct consequence of Isserlis' 1918 theorem for Gaussian
-variables). No numerical integration is required at any stage.
+kurtosis of \eqn{f(Z)} into simple, closed-form algebraic sums over the
+fitted coefficients, evaluated exactly via the raw moments \eqn{E[Z^j]} of
+the standard normal distribution (a direct consequence of Isserlis' 1918
+theorem for Gaussian variables). No numerical integration is required at any
+stage.
 }
 \keyword{internal}

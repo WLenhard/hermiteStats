@@ -4,7 +4,7 @@
 \alias{shape_hermite}
 \alias{shape_hermite.formula}
 \alias{shape_hermite.default}
-\title{Distribution-Robust Permutation Test for Shape Differences (Variance, Skewness, Kurtosis)}
+\title{Distribution-Robust Shape Difference Test (Scale, Asymmetry, Tail Weight)}
 \usage{
 shape_hermite(x, ...)
 
@@ -13,11 +13,11 @@ shape_hermite(x, ...)
   data = NULL,
   paired = FALSE,
   degree = 3L,
-  monotonicity = c("relaxed", "strict", "none"),
-  ties_method = c("average", "random"),
-  nperm = 2000L,
+  align = c("location", "none"),
+  contrasts = c("asymmetry", "tailweight", "scale"),
+  omnibus = c("minP", "maxT", "T2", "none"),
+  nperm = 1000L,
   min_success = 0.9,
-  omnibus = TRUE,
   ...
 )
 
@@ -26,67 +26,140 @@ shape_hermite(x, ...)
   y,
   paired = FALSE,
   degree = 3L,
-  monotonicity = c("relaxed", "strict", "none"),
-  ties_method = c("average", "random"),
-  nperm = 2000L,
+  align = c("location", "none"),
+  contrasts = c("asymmetry", "tailweight", "scale"),
+  omnibus = c("minP", "maxT", "T2", "none"),
+  nperm = 1000L,
   min_success = 0.9,
-  omnibus = TRUE,
   ...
 )
 }
 \arguments{
-\item{x}{A numeric vector of observations, or a two-sided \code{\link[stats]{formula}} of the form \code{response ~ group}.}
+\item{x}{A numeric vector of observations for Group 1 (or the baseline in
+paired designs), or a two-sided \code{\link[stats]{formula}} of the form
+\code{response ~ group}.}
 
 \item{...}{Additional arguments passed to methods.}
 
-\item{formula}{A two-sided \code{\link[stats]{formula}} of the form \code{response ~ group}.}
+\item{formula}{A two-sided formula of the form \code{response ~ group}.}
 
-\item{data}{An optional data frame containing variables in \code{formula}.}
+\item{data}{An optional data frame containing the variables in \code{formula}.}
 
-\item{paired}{Logical; \code{TRUE} for a paired-samples design. Default is \code{FALSE}.}
+\item{paired}{Logical; \code{TRUE} for paired samples. Default \code{FALSE}.}
 
-\item{degree}{Integer scalar; maximum polynomial degree requested (default \code{3L}).}
+\item{degree}{Integer scalar; polynomial degree (default \code{3L}; odd, \eqn{\ge 3}).}
 
-\item{monotonicity}{Monotonicity constraint: \code{"relaxed"} (default), \code{"strict"}, or \code{"none"}.}
+\item{align}{Alignment mode: \code{"location"} (default; median-centered
+pooling) or \code{"none"} (raw exchangeability; tests \eqn{F_1 = F_2}).}
 
-\item{ties_method}{Rank tie-handling method: \code{"average"} (default) or \code{"random"}.}
+\item{contrasts}{Character vector; any subset of \code{"asymmetry"}
+(\eqn{c_2}), \code{"tailweight"} (\eqn{c_3}), and \code{"scale"}
+(\eqn{\log\sigma}).}
 
-\item{nperm}{Integer; number of permutation resamples (default \code{2000L}).}
+\item{omnibus}{Omnibus method: \code{"minP"} (default), \code{"maxT"},
+\code{"T2"}, or \code{"none"}. See Details.}
 
-\item{min_success}{Minimum proportion of successful permutation replicates required (default \code{0.90}).}
+\item{nperm}{Integer; number of permutation resamples (default \code{1000L}).}
 
-\item{omnibus}{Logical; if \code{TRUE} (default), computes an omnibus sum-of-squares shape test.}
+\item{min_success}{Minimum proportion of usable permutation replicates
+before a warning is issued (default \code{0.90}).}
 
-\item{y}{A numeric vector of observations for the second group.}
+\item{y}{Numeric vector of observations for Group 2.}
 }
 \value{
-An S3 object of class \code{"shape_hermite"}.
+An S3 object of class \code{"shape_hermite"} containing:
+\describe{
+  \item{\code{estimate}}{Named vector of observed contrasts (Group 2 \eqn{-}
+    Group 1) among \code{scale} (\eqn{\Delta\log\sigma}), \code{asymmetry}
+    (\eqn{\Delta c_2}), and \code{tailweight} (\eqn{\Delta c_3}).}
+  \item{\code{variance_ratio}}{\eqn{\hat\sigma_2^2 / \hat\sigma_1^2 =
+    \exp(2\,\Delta\log\sigma)}; reported when the scale contrast is tested.}
+  \item{\code{p_value}, \code{p_adjusted}}{Raw and Westfall-Young adjusted
+    permutation \eqn{p}-values.}
+  \item{\code{omnibus}}{List with \code{type}, \code{statistic}, and
+    \code{p_value} of the global shape test (or \code{NULL}).}
+  \item{\code{indices}}{Matrix of group shape indices
+    (\eqn{\log\sigma}, \eqn{c_2}, \eqn{c_3}).}
+  \item{\code{perm_distribution}}{Matrix of permutation contrasts under \eqn{H_0}.}
+  \item{\code{n1}, \code{n2}, \code{degree}, \code{align}, \code{contrasts},
+    \code{paired}, \code{nperm}, \code{n_perm_success}, \code{success_rate},
+    \code{method}}{Configuration and bookkeeping.}
+}
 }
 \description{
-Tests for differences in the regularized distributional shape
-(variance, skewness, excess kurtosis) between two independent groups or paired measurements,
-using closed-form Hermite moments and an exact permutation null distribution.
+Tests for differences in distributional shape between two independent
+groups or paired measurements: \strong{scale} (\eqn{\Delta \log\sigma}),
+\strong{asymmetry} (\eqn{\Delta c_2}, skewness direction), and \strong{tail
+weight} (\eqn{\Delta c_3}, kurtosis direction), using Parseval-standardized
+orthogonal Hermite weights and a location-aligned permutation null.
+}
+\details{
+\subsection{The Hermite shape indices}{
+For a quantile model \eqn{X = f(Z) = \sum_m a_m He_m(Z)} with regularized
+variance \eqn{\sigma^2 = \sum_{m \ge 1} a_m^2\, m!} (Parseval), the
+standardized weights
+\deqn{c_m = \frac{a_m \sqrt{m!}}{\sigma}, \qquad \sum_{m \ge 1} c_m^2 = 1}
+are direction cosines on the unit hypersphere: bounded in \eqn{[-1, 1]} and
+location-scale invariant. Unlike classical moment ratios \eqn{g_1, g_2}
+(volatile powers of order 3-4, Fleishman-boundary constrained), the
+\eqn{c_m} are smooth linear functionals of the order statistics, yielding
+well-behaved permutation distributions and substantially higher power (in
+simulations, several times that of the Kolmogorov-Smirnov test for
+asymmetry and tail departures).
+}
+
+\subsection{Location alignment}{
+With \code{align = "location"} (default), each group is centered at its
+sample median before pooling, so that mean/median differences cannot leak
+into the shape null (the tested null is equality of shape, not the omnibus
+\eqn{F_1 = F_2}). Since \eqn{c_2}, \eqn{c_3}, and \eqn{\log\sigma} are
+location-invariant, alignment does not alter the observed contrasts.
+}
+
+\subsection{Multiplicity and omnibus testing}{
+\describe{
+  \item{Westfall-Young step-down}{Adjusted \eqn{p}-values controlling the
+    family-wise error rate across the tested contrasts, exploiting the
+    joint permutation distribution (uniformly more powerful than
+    Bonferroni/Holm).}
+  \item{\code{omnibus = "minP"} (default)}{Tippett minimum-\eqn{p} global
+    test: powerful when the shape difference is concentrated in one
+    contrast.}
+  \item{\code{omnibus = "maxT"}}{Maximum standardized statistic.}
+  \item{\code{omnibus = "T2"}}{Permutation Hotelling-type Mahalanobis
+    statistic on the standardized contrast vector using the permutation
+    covariance: powerful when differences are spread across several
+    contrasts.}
+}
+}
 }
 \examples{
-# 1. Independent groups
-set.seed(1)
+# Asymmetry difference: normal vs. standardized gamma (equal mean/SD)
+set.seed(42)
 g1 <- rnorm(40)
-g2 <- rgamma(40, shape = 2)
-sres <- shape_hermite(g1, g2, nperm = 500)
-print(sres)
-plot(sres)
+g2 <- (rgamma(40, shape = 2) - 2) / sqrt(2)
 
-# 2. Formula interface
-df_shape <- data.frame(val = c(g1, g2), grp = factor(rep(c("A", "B"), each = 40)))
-sres_form <- shape_hermite(val ~ grp, data = df_shape, nperm = 500)
-print(sres_form)
+res <- shape_hermite(g1, g2, nperm = 500)
+print(res)
+plot(res)
+
+# Variance-only comparison, reported as a variance ratio
+shape_hermite(g1, 1.5 * g1 + rnorm(40, sd = 0.1),
+              contrasts = "scale", nperm = 500)
+
+# Formula interface
+df <- data.frame(score = c(g1, g2),
+                 group = factor(rep(c("Symmetric", "Skewed"), each = 40)))
+shape_hermite(score ~ group, data = df, nperm = 500)
 
 }
 \references{
-O'Brien, P. C. (1984). Procedures for comparing samples with multiple endpoints. \emph{Biometrics}, 40(4), 1079–1087. \doi{10.2307/2531158}
+Westfall, P. H., & Young, S. S. (1993). \emph{Resampling-Based Multiple
+Testing: Examples and Methods for p-Value Adjustment}. John Wiley & Sons.
 }
 \seealso{
-\code{\link{t_hermite}}, \code{\link{hermite_moments}}
+\code{\link{t_hermite}}, \code{\link{median_hermite}},
+  \code{\link{hermite_test}}, \code{\link{hermite_fit}}
 }
 \author{
 Wolfgang Lenhard, Alexandra Lenhard

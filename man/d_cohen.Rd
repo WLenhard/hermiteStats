@@ -18,7 +18,7 @@ hedges_g(x1, x2)
 \describe{
   \item{\code{"pooled"}}{(Default) Pooled within-group standard
     deviation, \eqn{s_p = \sqrt{[(n_1-1)s_1^2 + (n_2-1)s_2^2]/(n_1+n_2-2)}}
-    — the classical Cohen's \eqn{d} / Hedges' \eqn{g} standardizer.}
+    -- the classical Cohen's \eqn{d} / Hedges' \eqn{g} standardizer.}
   \item{\code{"avg"}}{Unweighted root-mean-square of the two group
     variances, \eqn{\sqrt{(s_1^2+s_2^2)/2}}, with degrees of freedom
     approximated via the Welch-Satterthwaite equation. Recommended when
@@ -57,5 +57,6 @@ d_cohen(g1, g2, correct_bias = FALSE) # uncorrected Cohen's d
 Hedges, L. V. (1981). Distribution theory for Glass's estimator of effect size and related estimators. \emph{Journal of Educational Statistics}, 6(2), 107-128. \doi{10.3102/10769986006002107}
 }
 \seealso{
-\code{\link{hedges_g}}, \code{\link{d_reg}}, \code{\link{hedges_correction}}
+\code{\link{hedges_g}}, \code{\link{d_reg}},
+  \code{\link{hedges_correction}}, \code{\link{t_hermite}}
 }

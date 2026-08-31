@@ -2,28 +2,19 @@
 % Please edit documentation in R/tests.R
 \name{plot.shape_hermite}
 \alias{plot.shape_hermite}
-\title{Plot a Hermite Shape-Difference Test Object}
+\title{Plot Method for Hermite Shape-Difference Test Objects}
 \usage{
 \method{plot}{shape_hermite}(x, ...)
 }
 \arguments{
 \item{x}{An object of class \code{"shape_hermite"}.}
 
-\item{...}{Additional graphical parameters.}
+\item{...}{Additional graphical parameters passed to \code{\link[graphics]{plot}}.}
 }
 \value{
-The object \code{x}, invisibly.
+Invisibly returns \code{x}.
 }
 \description{
-Displays a 3-panel visualization showing the permutation null distributions
-for \strong{Variance}, \strong{Skewness}, and \strong{Excess Kurtosis} differences,
-marking observed differences and annotating raw and Holm-adjusted \eqn{p}-values.
-}
-\examples{
-set.seed(42)
-g1 <- rnorm(40)
-g2 <- rgamma(40, shape = 2)
-sres <- shape_hermite(g1, g2, nperm = 500)
-plot(sres)
-
+Multi-panel visualization of the permutation null distributions per shape
+contrast, with observed differences and (adjusted) \eqn{p}-values annotated.
 }

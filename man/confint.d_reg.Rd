@@ -18,45 +18,39 @@
 
 \item{parm}{Ignored; included for S3 method consistency with \code{\link[stats]{confint}}.}
 
-\item{level}{Numeric scalar in \eqn{(0, 1)}; the requested confidence level (default is \code{0.95}).}
+\item{level}{Numeric scalar in \eqn{(0, 1)}; the requested confidence level
+(default \code{0.95}).}
 
-\item{method}{Character string specifying the confidence interval calculation method:
+\item{method}{Character string specifying the confidence interval method:
 \describe{
-  \item{\code{"bootstrap"}}{(Default) Non-parametric percentile bootstrap, refitting the
-    entire regularized quantile pipeline on each resample.}
-  \item{\code{"nct"}}{Analytical inversion of the noncentral \eqn{t} (lambda-prime)
-    distribution, treating the regularized point estimate as a pseudo-t pivot.}
+  \item{\code{"bootstrap"}}{(Default) Non-parametric percentile bootstrap,
+    refitting the entire regularized quantile pipeline on each resample
+    (preserving the paired structure where applicable).}
+  \item{\code{"nct"}}{Analytical inversion of the noncentral \eqn{t}
+    (lambda-prime) distribution, treating the regularized point estimate
+    as a pseudo-\eqn{t} pivot; see \code{\link{ci_nct}}.}
 }}
 
-\item{B}{Integer scalar; number of bootstrap replications when \code{method = "bootstrap"}
-(default is \code{1000L}).}
+\item{B}{Integer scalar; number of bootstrap replications when
+\code{method = "bootstrap"} (default \code{1000L}).}
 
 \item{...}{Additional arguments passed to internal methods.}
 }
 \value{
-A numeric matrix of dimension \code{1 x 2} containing the lower and upper
-  confidence limits, with column names indicating the corresponding percentiles.
+A numeric matrix of dimension \code{1 x 2} containing the lower and
+  upper confidence limits, with column names indicating the corresponding
+  percentiles.
 }
 \description{
 Computes non-parametric percentile bootstrap or analytical noncentral \eqn{t}
 (lambda-prime) confidence intervals for a fitted \code{"d_reg"} object.
 }
 \details{
-\subsection{Bootstrap Intervals (\code{method = "bootstrap"})}{
-In each bootstrap replication, observations are resampled with replacement (preserving
-paired structure if \code{object$paired = TRUE}), and the full quantile regularization
-pipeline is refitted from scratch. The \eqn{100(1 - \alpha)\%} interval is formed from the
-empirical percentiles \eqn{\alpha/2} and \eqn{1 - \alpha/2}.
-}
-\subsection{Noncentral-t Inversion (\code{method = "nct"})}{
-Computes exact confidence limits by inverting the cumulative noncentral \eqn{t}
-distribution (Lecoutre, 2007) with degrees of freedom and effective sample size \eqn{\tilde{n}}
-adapted to the design:
-\itemize{
-  \item \strong{Independent groups:} \eqn{\tilde{n} = n_1 n_2 / (n_1 + n_2)} and \eqn{\mathrm{df} = n_1 + n_2 - 2}.
-  \item \strong{Paired designs / Glass's \eqn{\Delta}:} \eqn{\tilde{n} = n_1} and \eqn{\mathrm{df} = n_1 - 1}.
-}
-}
+For \code{method = "nct"}, degrees of freedom and effective sample size
+\eqn{\tilde{n}} are adapted to the design: independent groups use
+\eqn{\tilde{n} = n_1 n_2 / (n_1 + n_2)} with \eqn{\mathrm{df} = n_1 + n_2 - 2};
+paired designs and Glass's \eqn{\Delta} use \eqn{\tilde{n} = n_1} with
+\eqn{\mathrm{df} = n_1 - 1}.
 }
 \examples{
 set.seed(42)
@@ -64,17 +58,13 @@ ctrl <- rlnorm(25, meanlog = 2.0, sdlog = 0.5)
 trt  <- rlnorm(25, meanlog = 2.3, sdlog = 0.5)
 fit <- d_reg(ctrl, trt)
 
-# Non-parametric Percentile Bootstrap 95\% CI
 confint(fit, level = 0.95, method = "bootstrap", B = 500)
-
-# Analytical Noncentral-t 95\% CI
 confint(fit, level = 0.95, method = "nct")
 
 }
 \references{
-Lecoutre, B. (2007). Another look at the confidence intervals for the noncentral T distribution.
-\emph{Journal of Modern Applied Statistical Methods}, 6(1), 107–116. \doi{10.22237/jmasm/1177992600}
+Lecoutre, B. (2007). Another look at the confidence intervals for the noncentral T distribution. \emph{Journal of Modern Applied Statistical Methods}, 6(1), 107-116. \doi{10.22237/jmasm/1177992600}
 }
 \seealso{
-\code{\link{d_reg}}
+\code{\link{d_reg}}, \code{\link{ci_nct}}
 }

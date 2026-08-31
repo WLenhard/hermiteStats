@@ -6,44 +6,44 @@ c(
     key     = "lenhard2026hermiteStatsPkg",
     title   = "{hermiteStats}: Distribution-Robust Statistics via Hermite Polynomial Quantile Modeling",
     author  = c(
-person(
-  given = "Wolfgang",
-  family = "Lenhard",
-  email = "wolfgang.lenhard@uni-wuerzburg.de",
-  comment = c(ORCID = "0000-0002-8184-6889")
-),
-person(
-  given = "Alexandra",
-  family = "Lenhard",
-  email = "lenhard@psychometrica.de",
-  comment = c(ORCID = "0000-0001-8680-4381")
-)
+      person(
+        given   = "Wolfgang",
+        family  = "Lenhard",
+        email   = "wolfgang.lenhard@uni-wuerzburg.de",
+        comment = c(ORCID = "0000-0002-8184-6889")
+      ),
+      person(
+        given   = "Alexandra",
+        family  = "Lenhard",
+        email   = "lenhard@psychometrica.de",
+        comment = c(ORCID = "0000-0001-8680-4381")
+      )
     ),
     year    = "2026",
-    note    = "R package version 0.1.0",
+    note    = "R package version 0.4.0",
     url     = "https://github.com/WLenhard/hermiteStats"
   ),
 
   bibentry(
     bibtype = "Unpublished",
     key     = "lenhard2026hermite",
-    title   = "The {Hermite-Mehler} Correlation: A Distribution-Robust Estimator of the {Pearson} Correlation Coefficient",
+    title   = "The {Hermite} Correlation: A Distribution-Robust Estimator of the {Pearson} Correlation Coefficient",
     author  = c(
-person(
-  given = "Wolfgang",
-  family = "Lenhard",
-  email = "wolfgang.lenhard@uni-wuerzburg.de",
-  comment = c(ORCID = "0000-0002-8184-6889")
-),
-person(
-  given = "Alexandra",
-  family = "Lenhard",
-  email = "lenhard@psychometrica.de",
-  comment = c(ORCID = "0000-0001-8680-4381")
-)
+      person(
+        given   = "Wolfgang",
+        family  = "Lenhard",
+        email   = "wolfgang.lenhard@uni-wuerzburg.de",
+        comment = c(ORCID = "0000-0002-8184-6889")
+      ),
+      person(
+        given   = "Alexandra",
+        family  = "Lenhard",
+        email   = "lenhard@psychometrica.de",
+        comment = c(ORCID = "0000-0001-8680-4381")
+      )
     ),
     year    = "2026",
-    note    = "Manuscript submitted for publication"
+    note    = "Manuscript in preparation"
   ),
 
   bibentry(
@@ -51,22 +51,49 @@ person(
     key     = "lenhard2026dreg",
     title   = "Distribution-Free Effect Size Estimation: A Robust Alternative to {Cohen's d} and Other Effect Size Estimators",
     author  = c(
-person(
-  given = "Wolfgang",
-  family = "Lenhard",
-  email = "wolfgang.lenhard@uni-wuerzburg.de",
-  comment = c(ORCID = "0000-0002-8184-6889")
-),
-person(
-  given = "Alexandra",
-  family = "Lenhard",
-  email = "lenhard@psychometrica.de",
-  comment = c(ORCID = "0000-0001-8680-4381")
-)
+      person(
+        given   = "Wolfgang",
+        family  = "Lenhard",
+        email   = "wolfgang.lenhard@uni-wuerzburg.de",
+        comment = c(ORCID = "0000-0002-8184-6889")
+      ),
+      person(
+        given   = "Alexandra",
+        family  = "Lenhard",
+        email   = "lenhard@psychometrica.de",
+        comment = c(ORCID = "0000-0001-8680-4381")
+      )
     ),
     year    = "2026",
     note    = "Manuscript submitted for publication"
+  ),
+
+  bibentry(
+    bibtype = "Unpublished",
+    key     = "lenhard2026hermitetests",
+    title   = "Distribution-Robust Permutation Tests for Comparing Two Distributions in Location, Scale, and Shape",
+    author  = c(
+      person(
+        given   = "Wolfgang",
+        family  = "Lenhard",
+        email   = "wolfgang.lenhard@uni-wuerzburg.de",
+        comment = c(ORCID = "0000-0002-8184-6889")
+      ),
+      person(
+        given   = "Alexandra",
+        family  = "Lenhard",
+        email   = "lenhard@psychometrica.de",
+        comment = c(ORCID = "0000-0001-8680-4381")
+      )
+    ),
+    year    = "2026",
+    note    = "Manuscript in preparation"
   )
 )
 
-
+citFooter(paste(
+  "Please cite the package together with the manuscript matching the",
+  "methods you used: the correlation paper for cor_hermite()/pcor_hermite(),",
+  "the effect size paper for d_reg(), and the hypothesis testing paper for",
+  "hermite_test(), t_hermite(), median_hermite(), and shape_hermite()."
+))

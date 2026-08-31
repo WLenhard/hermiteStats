@@ -4,11 +4,19 @@
 \alias{hermiteStats_plots}
 \title{Diagnostic and Interpretive Visualizations}
 \description{
-Base-graphics plotting methods for the three primary model objects in
-\code{hermiteStats}: \code{\link{hermite_fit}}, \code{\link{cor_hermite}},
+Base-graphics plotting methods for the primary estimation objects in
+\pkg{hermiteStats}: \code{\link{hermite_fit}}, \code{\link{cor_hermite}},
 and \code{\link{d_reg}}. Every plot is designed to make the regularization
-step transparent by displaying the raw empirical data alongside the fitted or
-implied regularized curves, allowing the plausibility of the underlying
-polynomial quantile models to be assessed visually.
+step transparent by displaying the raw empirical data alongside the fitted
+or implied regularized curves, so the plausibility of the underlying
+polynomial quantile models can be assessed visually.
+
+Plot methods for the hypothesis-test objects (\code{\link{t_hermite}},
+\code{\link{median_hermite}}, \code{\link{shape_hermite}},
+\code{\link{hermite_test}}) are documented alongside those functions.
+
+All numerical work (polynomial evaluation, Hermite basis construction) is
+delegated to the quantile engine; this file contains visualization code
+only.
 }
 \keyword{internal}

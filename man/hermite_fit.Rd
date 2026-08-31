@@ -22,17 +22,16 @@ number of unique values in \code{x}, reduced further under heavy tying,
 and stepped down whenever the fit fails the monotonicity check.}
 
 \item{monotonicity}{Monotonicity constraint passed to
-\code{\link{check_monotonicity}}: \code{"relaxed"} (default), \code{"strict"},
-or \code{"none"}.}
+\code{\link{check_monotonicity}}: \code{"relaxed"} (default),
+\code{"strict"}, or \code{"none"}.}
 
 \item{ties_method}{Method used to break rank ties before the inverse-normal
 transform: \code{"average"} (default; midranks) or \code{"random"}.}
 
 \item{force_odd}{Logical; if \code{TRUE} (default), only odd polynomial
-degrees (1, 3, 5, ...) are considered. Odd-degree polynomials are
-antisymmetric-plus-symmetric combinations that most naturally accommodate
-both skewed and symmetric quantile shapes without the boundary curvature
-artifacts even-degree terms tend to introduce.}
+degrees (1, 3, 5, ...) are considered. Odd-degree polynomials most
+naturally accommodate both skewed and symmetric quantile shapes without
+the boundary curvature artifacts even-degree terms tend to introduce.}
 }
 \value{
 An S3 object of class \code{"hermite_fit"} containing:
@@ -43,7 +42,7 @@ An S3 object of class \code{"hermite_fit"} containing:
   \item{\code{degree_requested}}{Requested polynomial degree.}
   \item{\code{mean}}{Regularized population mean, \eqn{\mu = a_0}.}
   \item{\code{variance}}{Regularized population variance, \eqn{\sigma^2 = \sum_{m=1}^k a_m^2\, m!}.}
-  \item{\code{sd}}{Regularized population standard deviation, \eqn{\sigma = \sqrt{\sigma^2}}.}
+  \item{\code{sd}}{Regularized population standard deviation.}
   \item{\code{skewness}}{Regularized population skewness, \eqn{\gamma_1 = \mu_3 / \sigma^3}.}
   \item{\code{excess_kurtosis}}{Regularized population excess kurtosis, \eqn{\gamma_2 = \mu_4 / \sigma^4 - 3}.}
   \item{\code{kurtosis}}{Regularized raw (Pearson) kurtosis, \eqn{\beta_2 = \mu_4 / \sigma^4}.}
@@ -62,9 +61,9 @@ inverse-normal transformation (NQT) and fits a low-degree, monotone
 polynomial quantile function \eqn{X = f(Z)} to these scores. The polynomial
 is re-expressed in the orthogonal Probabilists' Hermite basis, from which
 the population mean, variance, skewness, and excess kurtosis of the
-modeled distribution are obtained in closed algebraic form (no numerical
-integration, no distributional assumptions beyond the polynomial quantile
-model itself).
+modeled distribution are obtained in exact closed algebraic form (no
+numerical integration, no distributional assumptions beyond the polynomial
+quantile model itself).
 }
 \details{
 The polynomial degree is chosen adaptively for each sample. Starting from
@@ -83,11 +82,17 @@ fit <- hermite_fit(x)
 print(fit)
 plot(fit)
 
+# Predicted raw values at selected latent quantiles (median and quartiles)
+predict(fit, z = qnorm(c(0.25, 0.50, 0.75)))
+
 }
 \references{
-Isserlis, L. (1918). On a formula for the product-moment coefficient of any order of a normal frequency distribution. \emph{Biometrika}, 12(1/2), 134-139. \doi{10.1093/biomet/12.1-2.134}
+Isserlis, L. (1918). On a formula for the product-moment coefficient of any
+order of a normal frequency distribution. \emph{Biometrika}, 12(1/2),
+134-139. \doi{10.1093/biomet/12.1-2.134}
 }
 \seealso{
-\code{\link{hermite_moments}}, \code{\link{check_monotonicity}},
-  \code{\link{cor_hermite}}, \code{\link{d_reg}}
+\code{\link{hermite_moments}}, \code{\link{predict.hermite_fit}},
+  \code{\link{check_monotonicity}}, \code{\link{cor_hermite}},
+  \code{\link{d_reg}}, \code{\link{hermite_test}}
 }

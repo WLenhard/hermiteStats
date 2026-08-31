@@ -43,7 +43,7 @@ or a two-sided \code{\link[stats]{formula}} of the form \code{response ~ group}.
 \item{...}{Additional arguments passed to methods.}
 
 \item{data}{An optional data frame, list, or environment containing the
-variables referenced in \code{formula}.}
+variables referenced in the formula.}
 
 \item{degree}{Integer scalar; maximum polynomial degree for the marginal
 quantile functions (default \code{3}). Automatically reduced if
@@ -52,7 +52,8 @@ monotonicity is violated or too few unique values are available; see
 
 \item{copula}{Character string specifying the copula mode used for the paired
 correlation (\code{\link{cor_hermite}}) when \code{paired = TRUE}:
-\code{"none"} (default, copula-free cross-moments) or \code{"gaussian"} (Mehler identity).}
+\code{"none"} (default, copula-free cross-moments) or \code{"gaussian"}
+(Mehler identity).}
 
 \item{monotonicity}{Monotonicity constraint passed to \code{\link{hermite_fit}}:
 \describe{
@@ -110,18 +111,22 @@ An S3 object of class \code{"d_reg"} containing:
   \item{\code{d_reg}}{The regularized standardized mean difference on the
     raw scale (standardized by \eqn{\hat\sigma_{\mathrm{avg}}}).}
   \item{\code{d_z}}{Standardized mean change score (only if \code{paired = TRUE}).}
-  \item{\code{hedges_g}}{Small-sample bias-corrected Hedges' \eqn{g} (always reported as a benchmark).}
-  \item{\code{glass_delta}}{Glass's \eqn{\Delta} using only the Group 1 SD (always reported as a benchmark).}
+  \item{\code{hedges_g}}{Small-sample bias-corrected Hedges' \eqn{g} (benchmark).}
+  \item{\code{glass_delta}}{Glass's \eqn{\Delta} using only the Group 1 SD (benchmark).}
   \item{\code{type}, \code{paired}, \code{copula}}{Settings used.}
-  \item{\code{n1, n2}}{Group sample sizes.}
-  \item{\code{group1, group2}}{Regularized and raw moments per group (\code{mean}, \code{sd}, \code{variance}, \code{raw_mean}, \code{raw_sd}).}
+  \item{\code{n1}, \code{n2}}{Group sample sizes.}
+  \item{\code{group1}, \code{group2}}{Regularized and raw moments per group
+    (\code{mean}, \code{sd}, \code{variance}, \code{raw_mean}, \code{raw_sd}).}
   \item{\code{diff_moments}}{Moments of the difference scores (paired only).}
-  \item{\code{r_Hermite_paired}}{The \code{\link{cor_hermite}} object for the paired observations (paired only).}
-  \item{\code{sd_standardizer}}{The standard deviation actually used to standardize \code{estimate}.}
+  \item{\code{r_Hermite_paired}}{The \code{\link{cor_hermite}} object for the
+    paired observations (paired only).}
+  \item{\code{sd_standardizer}}{The standard deviation actually used to
+    standardize \code{estimate}.}
   \item{\code{degrees}}{Realized polynomial degrees per group.}
   \item{\code{monotonicity}}{Monotonicity constraint applied.}
-  \item{\code{fit1, fit2}}{Underlying \code{\link{hermite_fit}} objects.}
-  \item{\code{ci}, \code{conf_level}, \code{ci_method}}{Confidence interval results, if requested.}
+  \item{\code{fit1}, \code{fit2}}{Underlying \code{\link{hermite_fit}} objects.}
+  \item{\code{ci}, \code{conf_level}, \code{ci_method}}{Confidence interval
+    results, if requested.}
 }
 }
 \description{
@@ -131,6 +136,11 @@ classical metric and interpretation of Cohen's \eqn{d} and Hedges' \eqn{g}, but
 substantially reduces sampling variance and Mean Squared Error (MSE) under
 non-normal continuous distributions by replacing raw sample means/variances
 with regularized polynomial quantile models and closed-form Hermite moments.
+
+\code{d_reg()} is the package's \emph{estimation} tool for mean differences;
+its permutation-based \emph{hypothesis test} companion is
+\code{\link{t_hermite}} (or \code{\link{hermite_test}} for a joint test of
+all distributional aspects).
 }
 \details{
 \subsection{Rationale}{
@@ -162,10 +172,9 @@ When \code{paired = TRUE}, two complementary standardized metrics are reported:
         independent-groups effect sizes (e.g. in meta-analysis).
   \item \strong{Standardized mean change} (\eqn{d_z}): standardized by the
         regularized SD of the observed change scores \eqn{D = X_2 - X_1},
-        fitted directly as its own quantile model (rather than reconstructed
-        from the marginal moments), so that
-        \deqn{d_z = \frac{\hat\mu_D}{\hat\sigma_D}}
-        with \eqn{\hat\sigma_D = \sqrt{\hat\sigma_1^2 + \hat\sigma_2^2 - 2 r_{\mathrm{Hermite}}\hat\sigma_1\hat\sigma_2}}.
+        fitted directly as its own quantile model, so that
+        \eqn{d_z = \hat\mu_D / \hat\sigma_D} with
+        \eqn{\hat\sigma_D = \sqrt{\hat\sigma_1^2 + \hat\sigma_2^2 - 2 r_{\mathrm{Hermite}}\hat\sigma_1\hat\sigma_2}}.
 }
 }
 }
@@ -180,17 +189,18 @@ summary(fit1)
 
 # 2. Formula interface
 dat <- data.frame(
-  rt = c(ctrl, trt),
+  rt   = c(ctrl, trt),
   cond = factor(rep(c("Control", "Treatment"), each = 30))
 )
-fit_form <- d_reg(rt ~ cond, data = dat, conf_level = 0.95)
-print(fit_form)
+d_reg(rt ~ cond, data = dat, conf_level = 0.95)
 
 # 3. Paired / repeated-measures design
 pre  <- rlnorm(25, meanlog = 3.0, sdlog = 0.4)
 post <- pre + rnorm(25, mean = 4.0, sd = 1.5)
-fit_paired <- d_reg(pre, post, paired = TRUE, conf_level = 0.95)
-print(fit_paired)
+d_reg(pre, post, paired = TRUE, conf_level = 0.95)
+
+# 4. Matched hypothesis test for the same estimand
+t_hermite(ctrl, trt, nperm = 500)
 
 }
 \references{
@@ -202,14 +212,12 @@ Delacre, M., Lakens, D., Ley, C., Liu, L., & Leys, C. (2021). Why Hedges' gs bas
 
 Hedges, L. V. (1981). Distribution theory for Glass's estimator of effect size and related estimators. \emph{Journal of Educational Statistics}, 6(2), 107-128. \doi{10.3102/10769986006002107}
 
-Isserlis, L. (1918). On a formula for the product-moment coefficient of any order of a normal frequency distribution. \emph{Biometrika}, 12(1/2), 134-139. \doi{10.1093/biomet/12.1-2.134}
-
-Lecoutre, B. (2007). Another look at the confidence intervals for the noncentral T distribution. \emph{Journal of Modern Applied Statistical Methods}, 6(1), 107-116. \doi{10.22237/jmasm/1177992600}
-
 Lenhard, W., & Lenhard, A. (submitted). Distribution-Free Effect Size Estimation: A Robust Alternative to Cohen's d and other effect size estimators. \emph{Behavior Research Methods}.
 }
 \seealso{
-\code{\link{cor_hermite}}, \code{\link{hermite_fit}}, \code{\link{d_cohen}}, \code{\link{hedges_g}}
+\code{\link{t_hermite}} (matched hypothesis test),
+  \code{\link{hermite_test}}, \code{\link{cor_hermite}},
+  \code{\link{hermite_fit}}, \code{\link{d_cohen}}, \code{\link{hedges_g}}
 }
 \author{
 Wolfgang Lenhard, Alexandra Lenhard

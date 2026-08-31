@@ -1,3 +1,7 @@
+# =============================================================================
+# benchmarks.R -- Classical Benchmark Effect-Size Estimators and CIs
+# =============================================================================
+
 #' @title Classical Benchmark Effect-Size Estimators and Confidence Intervals
 #'
 #' @description
@@ -40,6 +44,7 @@ NULL
 #' hedges_correction(8)    # noticeable correction in small samples
 #' hedges_correction(100)  # negligible correction in large samples
 #'
+#' @seealso \code{\link{d_cohen}}, \code{\link{hedges_g}}, \code{\link{d_reg}}
 #' @export
 hedges_correction <- function(df) {
   df <- max(df, 1.0001)
@@ -62,7 +67,7 @@ hedges_correction <- function(df) {
 #'   \describe{
 #'     \item{\code{"pooled"}}{(Default) Pooled within-group standard
 #'       deviation, \eqn{s_p = \sqrt{[(n_1-1)s_1^2 + (n_2-1)s_2^2]/(n_1+n_2-2)}}
-#'       — the classical Cohen's \eqn{d} / Hedges' \eqn{g} standardizer.}
+#'       -- the classical Cohen's \eqn{d} / Hedges' \eqn{g} standardizer.}
 #'     \item{\code{"avg"}}{Unweighted root-mean-square of the two group
 #'       variances, \eqn{\sqrt{(s_1^2+s_2^2)/2}}, with degrees of freedom
 #'       approximated via the Welch-Satterthwaite equation. Recommended when
@@ -92,12 +97,15 @@ hedges_correction <- function(df) {
 #' @references
 #' Hedges, L. V. (1981). Distribution theory for Glass's estimator of effect size and related estimators. \emph{Journal of Educational Statistics}, 6(2), 107-128. \doi{10.3102/10769986006002107}
 #'
-#' @seealso \code{\link{hedges_g}}, \code{\link{d_reg}}, \code{\link{hedges_correction}}
+#' @seealso \code{\link{hedges_g}}, \code{\link{d_reg}},
+#'   \code{\link{hedges_correction}}, \code{\link{t_hermite}}
 #' @export
-d_cohen <- function(x1, x2, type = c("pooled", "avg", "glass"), correct_bias = TRUE) {
+d_cohen <- function(x1, x2, type = c("pooled", "avg", "glass"),
+                    correct_bias = TRUE) {
   type <- match.arg(type)
   n1 <- length(x1); n2 <- length(x2)
   if (n1 < 2L || n2 < 2L) return(NA_real_)
+
   s1 <- stats::sd(x1); s2 <- stats::sd(x2)
   md <- mean(x2) - mean(x1)
 
@@ -106,7 +114,8 @@ d_cohen <- function(x1, x2, type = c("pooled", "avg", "glass"), correct_bias = T
     df  <- n1 + n2 - 2L
   } else if (type == "avg") {
     sdv <- sqrt((s1^2 + s2^2) / 2.0)
-    df  <- (s1^2/n1 + s2^2/n2)^2 / ((s1^2/n1)^2/(n1 - 1L) + (s2^2/n2)^2/(n2 - 1L))
+    df  <- (s1^2 / n1 + s2^2 / n2)^2 /
+      ((s1^2 / n1)^2 / (n1 - 1L) + (s2^2 / n2)^2 / (n2 - 1L))
   } else {
     sdv <- s1
     df  <- n1 - 1L
@@ -171,11 +180,12 @@ hedges_g <- function(x1, x2) {
 #' # Paired-sample d_z: n_tilde and df both based on the number of pairs
 #' ci_nct(d_point = 0.5, n1 = 30, n2 = 30, df = 29, n_tilde = 30)
 #'
+#' @seealso \code{\link{confint.d_reg}}, \code{\link{d_reg}}
 #' @export
 ci_nct <- function(d_point, n1, n2, conf = 0.95, df = n1 + n2 - 2L, n_tilde = NULL) {
   if (is.null(n_tilde)) n_tilde <- (n1 * n2) / (n1 + n2)
-  t_obs   <- d_point * sqrt(n_tilde)
-  a       <- (1 - conf) / 2
+  t_obs <- d_point * sqrt(n_tilde)
+  a     <- (1 - conf) / 2
 
   ncp_from_t <- function(t_val, df_val, p_val) {
     f <- function(ncp) suppressWarnings(stats::pt(t_val, df = df_val, ncp = ncp)) - p_val

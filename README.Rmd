@@ -25,7 +25,7 @@ knitr::opts_chunk$set(
 
 1. **The Hermite Correlation (r_Hermite):** a distribution-robust estimator of the raw-scale Pearson correlation coefficient.
 2. **The Distribution-Free Effect Size (d_reg):** a robust standardized mean difference for independent and paired samples that retains the metric and interpretation of Cohen's *d* / Hedges' *g*.
-3. **Non-parametric hypothesis tests (t_hermite, shape_hermite):** robust hypotheses tests based on permutation and the fitted polynomials to test for mean (t_hermite) or shape differences (variance, skewness and kurtosis via shape_hermite), without relying on distributional assumptions 
+3. **Distribution-robust hypothesis tests (hermite_test):** permutation tests for differences in mean (`t_hermite`), median (`median_hermite`), and distributional shape — scale/variance, asymmetry, and tail weight (`shape_hermite`) — unified in `hermite_test()`, including a joint five-dimensional distributional profile test with Westfall–Young family-wise error control.
 
 The methods address a dilemma in robust statistics: classical solutions for non-normal data — trimming, Winsorizing, or converting to ranks — typically restore stability only by silently changing the quantity being estimated, discarding genuine tail variance in the process. `hermiteStats` instead models the empirical quantile function via regularized monotone polynomial smoothing and derives exact distributional moments in closed algebraic form using Probabilists' Hermite polynomials. It recovers the original, interpretable estimands of distributional moments, while gaining the stability of a robust method.
 
@@ -40,6 +40,7 @@ The methods address a dilemma in robust statistics: classical solutions for non-
   - [3. Mehler's Bilinear Expansion for Covariance](#3-mehlers-bilinear-expansion-for-covariance)
   - [4. Disentangling Construct Association from Scale Attenuation (A)](#4-disentangling-construct-association-from-scale-attenuation-a)
   - [5. Distribution-Free Effect Size (d_reg)](#5-distribution-free-effect-size-d_reg)
+  - [Hypothesis testing on the regularized quantile model](#6-hypothesis-testing-on-the-regularized-quantile-model)
 - [Installation](#installation)
 - [Quick Start and Examples](#quick-start-and-examples)
   - [Estimating Distributional Moments](#estimating-distributional-moments)
@@ -149,6 +150,15 @@ For **paired / repeated-measures designs** (`paired = TRUE`), the observed diffe
 $$\hat{\sigma}_D = \sqrt{\hat{\sigma}_1^2 + \hat{\sigma}_2^2 - 2\, r_{\text{Hermite}} \, \hat{\sigma}_1 \hat{\sigma}_2}$$
 
 (no equal-variance assumption required), which makes explicit why a stronger paired correlation mechanically shrinks the variance of the change scores, and hence inflates $d_z$ relative to $d_{\text{reg}}$.
+
+
+### 6. Hypothesis Testing on the Regularized Quantile Model
+
+Because every distributional aspect is a smooth functional of the fitted quantile polynomial — mean $\mu = a_0$, median $\operatorname{Med} = f(0) = \beta_0$, scale $\log\sigma$ with $\sigma^2 = \sum_m a_m^2 m!$, and the Parseval-standardized shape weights
+
+$$c_m = \frac{a_m\sqrt{m!}}{\sigma}, \qquad \sum_{m\ge1} c_m^2 = 1,$$
+
+two-sample hypothesis tests reduce to contrasts on these functionals. The indices $c_2$ (asymmetry) and $c_3$ (tail weight) are bounded in $[-1, 1]$ and location-scale invariant, which makes their permutation distributions far better behaved than those of classical moment ratios $g_1, g_2$. Since the finite-sample distribution of these regularized functionals has no closed form, inference is by **permutation** (default), refitting the full pipeline on every resample; family-wise error across multiple contrasts is controlled by **Westfall–Young step-down** adjustment on the joint permutation distribution.
 
 ---
 
@@ -296,51 +306,50 @@ print(fit_paired)
 
 `d_reg` (raw scale) is directly comparable to independent-groups effect sizes, e.g. in a meta-analysis mixing designs; `d_z` is standardized by the variability of the change scores themselves and will be larger whenever the paired Hermite correlation is strong (see [Mathematical Foundations §5](#5-distribution-free-effect-size-d_reg)).
 
+
 ### Hypothesis Testing
 
-Beyond point and interval estimation, hermiteStats provides two complementary permutation-based hypothesis tests built on the same regularized quantile-fitting engine used throughout the package: `t_hermite()` for testing differences in central tendency (mean/location) between two independent or paired samples, and `shape_hermite()` for testing differences in distributional shape (variance, skewness, and kurtosis). Because both statistics are derived from an adaptively fitted, degree-selected polynomial quantile model, their exact sampling distribution under the null hypothesis has no closed form — both functions therefore obtain p-values by permutation, refitting the entire Hermite pipeline on every resampled data set so that the reference distribution reflects the same estimation variability as the observed statistic.
+`hermiteStats` provides a full suite of distribution-robust two-sample and paired hypothesis tests, all built on the same regularized quantile engine and all defaulting to permutation inference (the entire estimation pipeline is refitted on every resample, so the null distribution reflects the same estimation variability as the observed statistic):
 
-#### `t_hermite()` — Testing Mean Differences
+| Function | Tests | Notes |
+|---|---|---|
+| `t_hermite()` | Mean difference | Regularized analogue of Welch's *t* |
+| `median_hermite()` | Median difference | On-metric median test; higher power than Welch on skewed data, calibrated where raw-median permutation fails |
+| `shape_hermite()` | Scale, asymmetry (c₂), tail weight (c₃) | Westfall–Young adjusted; far more powerful than KS for shape departures |
+| `hermite_test()` | All of the above, jointly | The unified entry point (recommended) |
 
-`t_hermite()` is a distribution-robust alternative to Student's/Welch's t-test and the paired t-test. It converts the regularized effect size from `d_reg()` — the raw-scale dreg for independent groups, or the standardized mean change dz for paired designs — into a t-like statistic, and evaluates it against a permutation null (group-label reshuffling for independent samples; sign-flipping of paired differences for paired designs). This retains the familiar, interpretable Cohen's-d / paired-t metric while avoiding the inflated Type-I error and loss of power that raw Student's t suffers under skewed or heavy-tailed data.
+The most convenient entry point is `hermite_test()`. With `test = "complete"` (the default), it evaluates all five contrasts — mean, median, scale, asymmetry, tail weight — against a single joint permutation null, adjusts the p-values across the whole family (Westfall–Young), and reports a global omnibus test of distributional equality:
 
 ```{r, eval = TRUE}
 set.seed(42)
-ctrl <- rlnorm(30, meanlog = 2.0, sdlog = 0.5)
-trt  <- rlnorm(30, meanlog = 2.3, sdlog = 0.5)
+g1 <- rnorm(50, mean = 10, sd = 2)
+g2 <- 10 + 2 * (rgamma(50, shape = 2) - 2) / sqrt(2)  # equal mean & SD, but skewed
 
-# Independent groups
-test_indep <- t_hermite(ctrl, trt, nperm = 2000)
-print(test_indep)
-
-# Paired / repeated-measures design
-pre  <- rlnorm(25, meanlog = 3.0, sdlog = 0.4)
-post <- pre + rnorm(25, mean = 4.0, sd = 1.5)
-test_paired <- t_hermite(pre, post, paired = TRUE, nperm = 2000)
-print(test_paired)
+res <- hermite_test(g1, g2, nperm = 1000)
+print(res)
 ```
 
-#### `shape_hermite()` — Testing Shape Differences (Variance, Skewness, Kurtosis)
-
-While `t_hermite()` focuses on location, `shape_hermite()` tests whether two groups differ in distributional shape, using the closed-form Hermite moments from `hermite_moments()`. Both groups are refit at a shared, matched polynomial degree to ensure their moments are directly comparable, and p-values — per moment, Holm-adjusted, plus an optional omnibus test combining all three — are again obtained by permutation. This makes it possible to detect and interpret distributional changes — e.g. a treatment that increases variance or skewness without shifting the mean — that a location-only test would miss entirely.
+Here a *t*-test or *F*-test would find nothing — the groups differ in *shape*, which the asymmetry contrast and the omnibus test detect. Single aspects are available via the `test` argument (delegating to the canonical functions, so their full diagnostics remain available):
 
 ```{r, eval = TRUE}
-# Independent groups: matched mean/SD but different skewness
-set.seed(1)
-g1 <- rnorm(60)
-g2 <- as.numeric(scale(rgamma(60, shape = 2)))
+# Median difference on skewed data (permutation, default)
+ctrl <- rlnorm(30, meanlog = 2.0, sdlog = 0.6)
+trt  <- rlnorm(30, meanlog = 2.4, sdlog = 0.6)
+hermite_test(ctrl, trt, test = "median", nperm = 1000)
 
-shape_test <- shape_hermite(g1, g2, nperm = 2000)
-print(shape_test)
-
-# Paired design: heavier-tailed change scores
-pre  <- rnorm(40)
-post <- pre + rt(40, df = 3) * 0.3
-shape_test_paired <- shape_hermite(pre, post, paired = TRUE, nperm = 2000)
-print(shape_test_paired)
+# Variance comparison, reported as a variance ratio
+hermite_test(ctrl, trt, test = "variance", nperm = 1000)
 ```
 
-Together, `t_hermite()` and `shape_hermite()` support a full "mean and shape" comparison between two groups or conditions, each using a resampling scheme matched to its own null hypothesis. Note that both functions refit the complete Hermite estimation pipeline on every permutation replicate, so runtime scales with the number of permutations. For exploratory use, a few hundred permutations are usually enough, while final reported results should use nperm ≥ 2000.
+Paired designs are supported throughout via `paired = TRUE` (sign-flipping / pair-swap permutation), and all tests accept the formula interface:
+
+```{r, eval = TRUE}
+df <- data.frame(score = c(g1, g2), group = factor(rep(c("A", "B"), each = 50)))
+hermite_test(score ~ group, data = df, nperm = 1000)
+```
+
+Every test object has a `plot()` method displaying the permutation null distribution(s) with the observed statistic marked. For exploratory work a few hundred permutations suffice; for reported results use `nperm >= 1000`.
+
 
 ### Diagnostic Visualizations
 
@@ -366,26 +375,33 @@ plot(fit_d)
 
 
 ## Citation
-If you use `hermiteStats` in published research, please cite both the software and the manuscripts describing the two estimators. Both manuscripts are currently under peer review; please check the package repository for updated publication details (journal, volume, DOI) once available.
+If you use `hermiteStats` in published research, please cite both the software and the manuscript describing the according estimators. The manuscripts are currently under peer review or inpreparation; please check the package repository for updated publication details (journal, volume, DOI) once available.
 
 ```bibtex
 @Manual{lenhard2026hermiteStatsPkg,
   title  = {{hermiteStats}: Distribution-Robust Statistics via Hermite Polynomial Quantile Modeling},
   author = {Wolfgang Lenhard and Alexandra Lenhard},
   year   = {2026},
-  note   = {R package version 0.1.0},
+  note   = {R package version 0.4.0},
   url    = {https://github.com/WLenhard/hermiteStats}
-}
-@Unpublished{lenhard2026hermite,
-  title  = {The {Hermite} Correlation: A Distribution-Robust Estimator of the {Pearson} Correlation Coefficient},
-  author = {Wolfgang Lenhard and Alexandra Lenhard},
-  note   = {Manuscript submitted for publication}
 }
 
 @Unpublished{lenhard2026dreg,
   title  = {Distribution-Free Effect Size Estimation: A Robust Alternative to {Cohen's d} and Other Effect Size Estimators},
   author = {Wolfgang Lenhard and Alexandra Lenhard},
   note   = {Manuscript submitted for publication}
+}
+
+@Unpublished{lenhard2026hermitetests,
+  title  = {Distribution-Robust Permutation Tests for Comparing Two Distributions in Location, Scale, and Shape via Hermite Quantile modelling},
+  author = {Wolfgang Lenhard and Alexandra Lenhard},
+  note   = {Manuscript in preparation}
+}
+
+@Unpublished{lenhard2026hermite,
+  title  = {The {Hermite} Correlation: A Distribution-Robust Estimator of the {Pearson} Correlation Coefficient},
+  author = {Wolfgang Lenhard and Alexandra Lenhard},
+  note   = {Manuscript in preparation}
 }
 ```
 

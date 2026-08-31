@@ -17,25 +17,28 @@ The object \code{x}, invisibly.
 \description{
 Displays two diagnostic panels:
 \enumerate{
-  \item \strong{Latent Normal Score Association:} Plots \eqn{Z_x} against \eqn{Z_y}.
-        For \code{copula = "gaussian"}, overlays the latent linear copula correlation \eqn{\rho_z};
-        for \code{copula = "none"}, displays the empirical rank-based dependence.
-  \item \strong{Manifest Association:} Displays the raw scatterplot annotated with
-        \eqn{r_{\mathrm{Hermite}}}. For \code{copula = "gaussian"}, overlays both the
-        model-implied conditional mean curve \eqn{\mathbb{E}[Y \mid X=x]} (exact via Mehler's identity)
-        and a non-parametric lowess smooth, displaying the shape-attenuation factor \eqn{A}.
-        For \code{copula = "none"}, displays the empirical lowess smooth without parametric assumptions.
+  \item \strong{Latent Normal Score Association:} \eqn{Z_x} against
+        \eqn{Z_y}. For \code{copula = "gaussian"}, overlays the latent
+        linear copula correlation \eqn{\rho_z}; for \code{copula = "none"},
+        the empirical rank-based dependence.
+  \item \strong{Manifest Association:} the raw scatterplot annotated with
+        \eqn{r_{\mathrm{Hermite}}}. For \code{copula = "gaussian"}, overlays
+        both the model-implied conditional mean curve \eqn{E[Y | X = x]}
+        (exact via Mehler's identity) and a non-parametric lowess smooth,
+        and displays the shape-attenuation factor \eqn{A}. For
+        \code{copula = "none"}, overlays the regularized linear regression
+        line and the empirical lowess smooth.
 }
 }
 \examples{
-# 1. Copula-free fit
+set.seed(1)
 x <- rnorm(50, 100, 15)
 y <- exp(0.5 * scale(x) + rnorm(50, sd = 0.5))
-fit_free <- cor_hermite(x, y, copula = "none")
-plot(fit_free)
 
-# 2. Gaussian copula fit with Mehler reference curve
-fit_gauss <- cor_hermite(x, y, copula = "gaussian")
-plot(fit_gauss)
+# Copula-free fit
+plot(cor_hermite(x, y, copula = "none"))
+
+# Gaussian copula fit with Mehler reference curve
+plot(cor_hermite(x, y, copula = "gaussian"))
 
 }

@@ -9,7 +9,8 @@
 \arguments{
 \item{x}{An object of class \code{"hermite_fit"}.}
 
-\item{main}{Character; plot title (realized degree is appended automatically).}
+\item{main}{Character; plot title (the realized degree is appended
+automatically).}
 
 \item{...}{Additional graphical parameters passed to \code{\link[graphics]{plot}}.}
 }

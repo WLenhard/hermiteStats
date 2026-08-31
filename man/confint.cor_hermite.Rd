@@ -18,35 +18,30 @@
 
 \item{parm}{Ignored; included for S3 method consistency with \code{\link[stats]{confint}}.}
 
-\item{level}{Numeric scalar in \eqn{(0, 1)}; the requested confidence level (default is \code{0.95}).}
+\item{level}{Numeric scalar in \eqn{(0, 1)}; the requested confidence level
+(default \code{0.95}).}
 
-\item{method}{Character string specifying the confidence interval calculation method:
+\item{method}{Character string specifying the confidence interval method:
 \describe{
-  \item{\code{"fisher"}}{(Default) Fast analytical Fisher \eqn{z}-transformation with
-    asymptotic standard error \eqn{\mathrm{SE} = 1/\sqrt{n - 3}}.}
+  \item{\code{"fisher"}}{(Default) Fast analytical Fisher \eqn{z}-transformation
+    with asymptotic standard error \eqn{\mathrm{SE} = 1/\sqrt{n - 3}}.}
   \item{\code{"bootstrap"}}{Non-parametric percentile bootstrap refitting the full
-    Hermite pipeline (NQT, polynomial quantile model, covariance estimation) across resamples.}
+    Hermite pipeline across resamples; see \code{\link{cor_hermite_boot_ci}}.}
 }}
 
-\item{B}{Integer scalar; number of bootstrap replications when \code{method = "bootstrap"}
-(default is \code{1000L}).}
+\item{B}{Integer scalar; number of bootstrap replications when
+\code{method = "bootstrap"} (default \code{1000L}).}
 
 \item{...}{Additional arguments passed to internal methods.}
 }
 \value{
-A numeric matrix of dimension \code{1 x 2} containing the lower and upper
-  confidence limits, with column names indicating the corresponding percentiles.
+A numeric matrix of dimension \code{1 x 2} containing the lower and
+  upper confidence limits, with column names indicating the corresponding
+  percentiles.
 }
 \description{
 Computes analytical Fisher \eqn{z} or non-parametric percentile bootstrap
 confidence intervals for a fitted \code{"cor_hermite"} object.
-}
-\details{
-When \code{method = "fisher"}, the interval is obtained by inverting the Fisher
-\eqn{z}-transformation on \eqn{r_{\mathrm{Hermite}}}. When \code{method = "bootstrap"},
-the function calls \code{\link{cor_hermite_boot_ci}}, refitting the model from scratch
-in each bootstrap replicate while inheriting the original polynomial degree and
-copula settings.
 }
 \examples{
 set.seed(42)
@@ -54,10 +49,7 @@ x <- rnorm(40)
 y <- 0.5 * x + rnorm(40)
 fit <- cor_hermite(x, y)
 
-# Analytical Fisher-z 95\% CI
 confint(fit, level = 0.95, method = "fisher")
-
-# Percentile Bootstrap 95\% CI
 confint(fit, level = 0.95, method = "bootstrap", B = 500)
 
 }

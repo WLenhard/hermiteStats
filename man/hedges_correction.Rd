@@ -33,3 +33,6 @@ hedges_correction(100)  # negligible correction in large samples
 \references{
 Hedges, L. V. (1981). Distribution theory for Glass's estimator of effect size and related estimators. \emph{Journal of Educational Statistics}, 6(2), 107-128. \doi{10.3102/10769986006002107}
 }
+\seealso{
+\code{\link{d_cohen}}, \code{\link{hedges_g}}, \code{\link{d_reg}}
+}

@@ -52,3 +52,6 @@ Lecoutre, B. (2007). Another look at the confidence intervals for the noncentral
 
 Steiger, J. H., & Fouladi, R. T. (1997). Noncentrality interval estimation and the evaluation of statistical models. In L. L. Harlow, S. A. Mulaik, & J. H. Steiger (Eds.), \emph{What if there were no significance tests?} (pp. 221-257). Lawrence Erlbaum Associates.
 }
+\seealso{
+\code{\link{confint.d_reg}}, \code{\link{d_reg}}
+}

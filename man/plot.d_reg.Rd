@@ -17,13 +17,14 @@ The object \code{x}, invisibly.
 \description{
 Displays two diagnostic panels:
 \enumerate{
-  \item \strong{Group Distributions:} Overlays the empirical kernel densities of
-        both groups with regularized group means marked by dashed vertical lines,
-        annotating the effect size estimate and confidence interval.
-  \item \strong{Regularized Quantile Maps:} Displays both groups' fitted monotone
-        polynomial quantile curves \eqn{X = f(Z)} on a shared latent normal axis,
-        providing a direct visual inspection of differences in location, variance,
-        and shape asymmetry.
+  \item \strong{Group Distributions:} overlaid empirical kernel densities
+        with the regularized group means marked by dashed vertical lines,
+        annotated with the effect size estimate and confidence interval
+        (if available).
+  \item \strong{Regularized Quantile Maps:} both groups' fitted monotone
+        polynomial quantile curves \eqn{X = f(Z)} on a shared latent normal
+        axis, allowing direct visual comparison of location, scale, and
+        shape asymmetry.
 }
 }
 \examples{
