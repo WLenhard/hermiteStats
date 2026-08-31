@@ -769,7 +769,7 @@ plot(fit_d)
 
 If you use `hermiteStats` in published research, please cite both the
 software and the manuscript describing the according estimators. The
-manuscripts are currently under peer review or inpreparation; please
+manuscripts are currently under peer review or in preparation; please
 check the package repository for updated publication details (journal,
 volume, DOI) once available.
 
@@ -785,7 +785,7 @@ volume, DOI) once available.
 @Unpublished{lenhard2026dreg,
   title  = {Distribution-Free Effect Size Estimation: A Robust Alternative to {Cohen's d} and Other Effect Size Estimators},
   author = {Wolfgang Lenhard and Alexandra Lenhard},
-  note   = {Manuscript submitted for publication}
+  note   = {Manuscript under review}
 }
 
 @Unpublished{lenhard2026hermitetests,
