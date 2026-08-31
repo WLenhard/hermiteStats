@@ -175,8 +175,10 @@ and higher precision across a vast range of distributional scenarios
 $$\widehat{\text{Cov}}(X, Y) = \frac{1}{n} \sum_{i=1}^n \left(\hat{x}_i - \hat{\mu}_x\right)\left(\hat{y}_i - \hat{\mu}_y\right)$$
 
 where
-$\hat{x}_i = f(Z_{x, i}) = \sum_{j=0}^{k_x} \beta_{x, j} Z_{x, i}^j$ is
-the fitted value for observation $i$ from the monotone quantile model
+
+$$\hat{x}_i = f(Z_{x, i}) = \sum_{j=0}^{k_x} \beta_{x, j} Z_{x, i}^j$$
+
+is the fitted value for observation $i$ from the monotone quantile model
 (see step 1), and $\hat{\mu}_x = a_0$ is the regularized population mean
 derived from the Hermite polynomial representation.
 
@@ -255,7 +257,7 @@ change scores, and hence inflates $d_z$ relative to $d_{\text{reg}}$.
 
 Because every distributional aspect is a smooth functional of the fitted
 quantile polynomial — mean $\mu = a_0$, median
-$\operatorname{Med} = f(0) = \beta_0$, scale $\log\sigma$ with
+$\text{Med} = f(0) = \beta_0$, scale $\log\sigma$ with
 $\sigma^2 = \sum_m a_m^2 m!$, and the Parseval-standardized shape
 weights
 
