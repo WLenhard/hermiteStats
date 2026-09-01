@@ -7,8 +7,8 @@ source("simulation/sim_shape_helper.R")
 
 # ---- 1. Simulation Parameters ------------------------------------------------
 REPS_NULL  <- 2500L          # MCSE = 0.0044 at alpha = 0.05 (Tight 95% CI: [0.041, 0.059])
-REPS_POWER <- 1000L          # Paired stream yields high power precision
-NPERM      <- 999L           # Clean 0.001 resolution (Publication standard)
+REPS_POWER <- 1000L          # High power precision
+NPERM      <- 999L           # Clean 0.001 resolution
 SEED       <- 20260201L
 CORES      <- max(1L, parallel::detectCores() - 1L)
 
