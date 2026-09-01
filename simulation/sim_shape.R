@@ -1,3 +1,9 @@
+# TODO
+# 1. Include shape mismatch norm-lnorm (asymetric), norm-t (symmetric)
+# 2. Include dependent tests benchmark, including cor_hermite
+
+
+
 # ==============================================================================
 # sim_shape.R -- Benchmark Driver for shape_hermite
 # ==============================================================================
@@ -6,11 +12,12 @@ source("simulation/sim_shape_helper.R")
 
 
 # ---- 1. Simulation Parameters ------------------------------------------------
-REPS_NULL  <- 2500L          # MCSE = 0.0044 at alpha = 0.05 (Tight 95% CI: [0.041, 0.059])
-REPS_POWER <- 1000L          # High power precision
-NPERM      <- 999L           # Clean 0.001 resolution
-SEED       <- 20260201L
-CORES      <- max(1L, parallel::detectCores() - 1L)
+REPS_NULL   <- 1e3                # Replications for null effects, Type 1 errors
+REPS_POWER  <- 1e3                # Replications for power analysis
+NPERM       <- 1e3 - 1L           # Permutation replicates per test
+POPULATION  <- 1e6                # Population size
+SEED        <- 20260201L
+CORES       <- max(1L, parallel::detectCores() - 1L)
 
 # ---- 2. Design Grid ----------------------------------------------------------
 balanced   <- data.frame(n1 = c(10, 15, 20, 30, 50, 100))
@@ -30,36 +37,28 @@ cat(sprintf("Configured Cells -> Null / Partial-Null: %d | Power: %d | Total: %d
             nrow(cond_null), nrow(cond_power), nrow(cond_null) + nrow(cond_power)))
 
 # ---- 3. Population Estimand Projection ---------------------------------------
-truth <- shape_population_truth(N = 2e5)
+truth <- shape_population_truth(N = POPULATION)
 cat("\n--- Population Hermite Contrasts (Degree-3 Projection) ---\n")
 print(truth, digits = 3, row.names = FALSE)
-write.csv(truth, "sim_shape_population_truth.csv", row.names = FALSE)
+
 
 # ---- 4. Execution ------------------------------------------------------------
 pv_null  <- run_shape_sim(cond_null,  n_reps = REPS_NULL,  nperm = NPERM,
                           n_cores = CORES, seed = SEED)
 pv_power <- run_shape_sim(cond_power, n_reps = REPS_POWER, nperm = NPERM,
-                          n_cores = CORES, seed = SEED + 7L)
-
+                          n_cores = CORES, seed = SEED + 100L)
 pv <- dplyr::bind_rows(pv_null, pv_power)
-saveRDS(pv, "sim_shape_pvalues.rds")
+
 
 # ---- 5. Analysis, Summaries & Win-Rate Output --------------------------------
 rt <- summary_shape(pv, alpha = 0.05)
 win_summary <- win_rate_summary(pv, alpha = 0.05)
-
-write.csv(rt, "sim_shape_rates.csv", row.names = FALSE)
-write.csv(size_adjusted(pv), "sim_shape_power_sizeadjusted.csv", row.names = FALSE)
-write.csv(win_summary, "sim_shape_win_rates.csv", row.names = FALSE)
+win_summary
 
 # ---- 6. Diagnostic Visualizations --------------------------------------------
-pdf("sim_shape_alpha.pdf", width = 12, height = 7)
 plot_shape_alpha(pv)
-dev.off()
-
-pdf("sim_shape_power.pdf", width = 13, height = 9)
 plot_shape_power(pv)
-dev.off()
+
 
 # ---- 7. Fit Failure Checks ---------------------------------------------------
 cat("\n--- Numerical Fit Failure Rates by Cell (Target: 0) ---\n")
@@ -73,5 +72,12 @@ if (nrow(fails) > 0) {
 } else {
   cat("All quantile fits completed without degeneracy across all replications.\n")
 }
+
+# ---- 8. Save results ---------------------------------------------------------
+# write.csv(truth, "sim_shape_population_truth.csv", row.names = FALSE)
+# write.csv(rt, "sim_shape_rates.csv", row.names = FALSE)
+# write.csv(size_adjusted(pv), "sim_shape_power_sizeadjusted.csv", row.names = FALSE)
+# write.csv(win_summary, "sim_shape_win_rates.csv", row.names = FALSE)
+# saveRDS(pv, "sim_shape_pvalues.rds")
 
 cat("\nBenchmark run completed successfully.\n")

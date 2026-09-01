@@ -1,3 +1,14 @@
+# TODO
+# 1. Rename Wilcoxon to Mann-Whitney-U test (independent sample)
+# 2. Add Mood's Median test as a benchmark (-> median_hermite)
+# 3. Draft dependent sample simulation, which draws an cor_hermite, Gaussian copula?
+# 4. Probably integrate with the shape test simulation
+
+
+
+
+
+
 # ==============================================================================
 # sim_test.R -- Driver for Location Benchmarking (Mean & Median Domains)
 # ==============================================================================
@@ -8,8 +19,9 @@ source("simulation/sim_test_helper.R")
 # ------------------------------------------------------------------------------
 # 1. Simulation Parameters
 # ------------------------------------------------------------------------------
-repetitions <- 1e3          # Monte Carlo replications per cell
-n_perms     <- 1e3          # Permutation replicates per test
+repetitions <- 1e3                # Monte Carlo replications per cell
+n_perms     <- 1e3 - 1L           # Permutation replicates per test
+population  <- 1e6                # Population size
 SEED        <- 20260101L
 CORES       <- max(1L, parallel::detectCores() - 1L)
 
@@ -79,11 +91,10 @@ sim_output <- run_location_sim(
   n_cores        = CORES,
   alpha          = 0.05,
   seed           = SEED,
-  truth_pop_size = 1e6
+  truth_pop_size = POPULATION
 )
 
 agg <- sim_output$aggregated
-saveRDS(sim_output, "sim_location_results.rds")
 
 # ------------------------------------------------------------------------------
 # 4. Summary Tables & Publication Figures
@@ -92,9 +103,14 @@ summary_location_sim(agg, alpha = 0.05)
 
 # Visualizations
 plot_type1_error_comparison(agg, nominal = 0.05)
+plot_location_power_curves(agg, dist_focus = "norm")
 plot_location_power_curves(agg, dist_focus = "lnorm")
 plot_location_power_curves(agg, dist_focus = "t")
 plot_location_power_curves(agg, dist_focus = "exp")
+plot_location_power_curves(agg, dist_focus = "1plirt")
+plot_location_power_curves(agg, dist_focus = "outlier")
 
 # write.csv(agg, "sim_location_aggregated.csv", row.names = FALSE)
+# saveRDS(sim_output, "sim_location_results.rds")
+
 cat("\nLocation simulation pipeline completed successfully.\n")
