@@ -153,7 +153,7 @@ evaluated using the raw Gaussian moments $\mathbb{E}[Z^j]$ — a direct
 consequence of Isserlis’ (1918) theorem for products of jointly normal
 variables:
 
-$$\gamma_1 = \frac{\mathbb{E}[(X-\mu)^3]}{\sigma^3}, \qquad \gamma_2 = \frac{\mathbb{E}[(X-\mu)^4]}{\sigma^4} - 3$$
+$$\gamma_1 = \frac{\mathbb{E}[(X-\hat{\mu})^3]}{\hat{\sigma}^3}, \qquad \gamma_2 = \frac{\mathbb{E}[(X-\hat{\mu})^4]}{\hat{\sigma}^4} - 3$$
 
 All four moments are obtained this way in exact closed algebraic form,
 with no numerical integration at any step.
