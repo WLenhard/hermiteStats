@@ -1,74 +1,100 @@
 # ==============================================================================
-# sim_test.R -- Driver Script for Benchmarking t_hermite
+# sim_test.R -- Driver for Location Benchmarking (Mean & Median Domains)
 # ==============================================================================
 
-if (file.exists("DESCRIPTION")) {
-  devtools::load_all(".")
-  source("simulations/sim_test_helper.R")
-} else {
-  devtools::load_all("..")
-  source("sim_test_helper.R")
-}
+source("simulation/sim_test_helper.R")
+
 
 # ------------------------------------------------------------------------------
 # 1. Simulation Parameters
 # ------------------------------------------------------------------------------
-repetitions <- 500L          # Replications per condition cell
-n_perms     <- 1000L         # Permutations per test (Publication Grade)
+repetitions <- 1e3          # Monte Carlo replications per cell
+n_perms     <- 1e3          # Permutation replicates per test
 SEED        <- 20260101L
+CORES       <- max(1L, parallel::detectCores() - 1L)
 
 # ------------------------------------------------------------------------------
-# 2. Design Grid
+# 2. Design Grid (Balanced + Behrens-Fisher Unbalanced Cells)
 # ------------------------------------------------------------------------------
-sample_sizes <- c(10, 15, 25, 50, 100)
+
+# A. Standard balanced sample sizes
+balanced_sizes <- data.frame(
+  n1 = c(15, 25, 50, 100),
+  n2 = c(15, 25, 50, 100)
+)
+
+# B. Behrens-Fisher unbalanced sample sizes (1:3 ratio)
+unbalanced_sizes <- data.frame(
+  n1 = c(15, 20),
+  n2 = c(45, 60)
+)
+
+all_sizes <- rbind(balanced_sizes, unbalanced_sizes)
 effect_sizes <- c(0.0, 0.2, 0.5, 0.8)
 
-base_conditions <- expand.grid(
-  n_sample = sample_sizes,
-  delta    = effect_sizes
+# Core distribution specifications
+dist_specs <- rbind(
+  data.frame(dist = "norm",    param1 = 0,  param2 = 1,   param3 = NA, scale_ratio = 1.0), # Gaussian
+  data.frame(dist = "lnorm",   param1 = 0,  param2 = 0.8, param3 = NA, scale_ratio = 1.0), # Skewed
+  data.frame(dist = "t",       param1 = 3,  param2 = 1,   param3 = NA, scale_ratio = 1.0), # Heavy-tailed (t3)
+  data.frame(dist = "exp",     param1 = 1,  param2 = NA,  param3 = NA, scale_ratio = 1.0), # Exponential
+  data.frame(dist = "outlier", param1 = 4,  param2 = NA,  param3 = 0.02, scale_ratio = 1.0), # 2% contamination
+  data.frame(dist = "1plirt",  param1 = 0,  param2 = 1,   param3 = 20, scale_ratio = 1.0), # Psychometric IRT
+
+  # Behrens-Fisher stress conditions: variance ratio 1:4 (sigma2 / sigma1 = 2.0 or 0.5)
+  data.frame(dist = "norm",    param1 = 0,  param2 = 1,   param3 = NA, scale_ratio = 2.0), # Direct heteroscedastic
+  data.frame(dist = "norm",    param1 = 0,  param2 = 1,   param3 = NA, scale_ratio = 0.5), # Inverse heteroscedastic
+  data.frame(dist = "lnorm",   param1 = 0,  param2 = 0.8, param3 = NA, scale_ratio = 1.5)  # Skewed + heteroscedastic
 )
 
-dist_params <- rbind(
-  data.frame(dist = "norm",    param1 = 0,  param2 = 1,   param3 = NA),   # Normal
-  data.frame(dist = "lnorm",   param1 = 0,  param2 = 0.8, param3 = NA),   # Right skew
-  data.frame(dist = "t",       param1 = 3,  param2 = 1,   param3 = NA),   # Heavy tails / t3
-  data.frame(dist = "exp",     param1 = 1,  param2 = NA,  param3 = NA),   # Exponential decay
-  data.frame(dist = "outlier", param1 = 4,  param2 = NA,  param3 = 0.02), # 2% contamination
-  data.frame(dist = "1plirt",  param1 = 0,  param2 = 1,   param3 = 20)    # Discrete IRT
+# Construct full factorial grid
+sim_conditions <- merge(
+  expand.grid(
+    size_idx = seq_len(nrow(all_sizes)),
+    delta    = effect_sizes,
+    stringsAsFactors = FALSE
+  ),
+  cbind(size_idx = seq_len(nrow(all_sizes)), all_sizes),
+  by = "size_idx"
 )
+sim_conditions$size_idx <- NULL
 
-sim_conditions <- merge(base_conditions, dist_params, all = TRUE)
+sim_conditions <- merge(sim_conditions, dist_specs, all = TRUE)
+
+# Filter out redundant combinations (only run heteroscedastic scales on relevant size cells)
+sim_conditions <- sim_conditions %>%
+  dplyr::filter(
+    scale_ratio == 1.0 | (n1 != n2) | (n1 == 25 & n2 == 25)
+  )
+
+cat(sprintf("Configured Location Simulation Grid: %d condition cells\n", nrow(sim_conditions)))
 
 # ------------------------------------------------------------------------------
-# 3. Run Simulation
+# 3. Execution
 # ------------------------------------------------------------------------------
-sim_results <- run_test_sim(
+sim_output <- run_location_sim(
   conditions     = sim_conditions,
   n_reps         = repetitions,
   nperm          = n_perms,
-  n_cores        = max(1, parallel::detectCores() - 1),
+  n_cores        = CORES,
   alpha          = 0.05,
   seed           = SEED,
   truth_pop_size = 1e6
 )
 
-agg <- sim_results$aggregated
-save(sim_results, agg, file = "sim_test_results.RData")
+agg <- sim_output$aggregated
+saveRDS(sim_output, "sim_location_results.rds")
 
 # ------------------------------------------------------------------------------
-# 4. Summary & Visualizations
+# 4. Summary Tables & Publication Figures
 # ------------------------------------------------------------------------------
-summary.sim_test(agg)
+summary_location_sim(agg, alpha = 0.05)
 
-# Multi-panel Type I error across sample sizes
-plot_type1_error(agg, by = "sample_size")
+# Visualizations
+plot_type1_error_comparison(agg, nominal = 0.05)
+plot_location_power_curves(agg, dist_focus = "lnorm")
+plot_location_power_curves(agg, dist_focus = "t")
+plot_location_power_curves(agg, dist_focus = "exp")
 
-# Power curves across sample sizes
-plot_power_curves(agg, dist_focus = "lnorm")
-plot_power_curves(agg, dist_focus = "t")
-plot_power_curves(agg, dist_focus = "exp")
-plot_power_curves(agg, dist_focus = "norm")
-plot_power_curves(agg, dist_focus = "1plirt")
-plot_power_curves(agg, dist_focus = "outlier")
-
-write.csv(agg, file = "sim_test_aggregated_results.csv", row.names = FALSE)
+# write.csv(agg, "sim_location_aggregated.csv", row.names = FALSE)
+cat("\nLocation simulation pipeline completed successfully.\n")
